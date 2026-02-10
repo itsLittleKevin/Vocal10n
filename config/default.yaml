@@ -38,7 +38,7 @@ stt:
   window_seconds: 6.5
   confirm_threshold: 0.3
   min_transcribe_duration: 0.3
-  max_segment_age: 2.0
+  max_segment_age: 4.0
 
   # Audio capture
   sample_rate: 16000
