@@ -3,7 +3,6 @@
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -17,6 +16,7 @@ from PySide6.QtWidgets import (
 from vocal10n.config import get_config
 from vocal10n.constants import Language, ModelStatus
 from vocal10n.state import SystemState
+from vocal10n.ui.utils.combobox_styling import ArrowComboBox
 from vocal10n.ui.widgets.model_selector import ModelSelector
 from vocal10n.ui.widgets.param_slider import ParamSlider
 
@@ -46,7 +46,7 @@ class TranslationTab(QWidget):
         # ── Backend selector ──────────────────────────────────────────
         backend_box = QGroupBox("Backend")
         bb_lay = QHBoxLayout(backend_box)
-        self._backend_combo = QComboBox()
+        self._backend_combo = ArrowComboBox()
         self._backend_combo.addItems(["Local GGUF", "OpenAI API"])
         cur_backend = self._cfg.get("translation.backend", "local")
         if cur_backend == "api":
@@ -134,7 +134,7 @@ class TranslationTab(QWidget):
         # ── Target language ───────────────────────────────────────────
         lang_box = QGroupBox("Target Language")
         lb_lay = QHBoxLayout(lang_box)
-        self._target_combo = QComboBox()
+        self._target_combo = ArrowComboBox()
         self._target_combo.addItems(["English", "Chinese"])
         cur = self._cfg.get("translation.target_language", "English")
         idx = self._target_combo.findText(cur)

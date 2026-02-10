@@ -5,7 +5,6 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
 from vocal10n.config import get_config
 from vocal10n.constants import Language, ModelStatus
 from vocal10n.state import SystemState
+from vocal10n.ui.utils.combobox_styling import ArrowComboBox
 from vocal10n.ui.widgets.model_selector import ModelSelector
 from vocal10n.ui.widgets.param_slider import ParamSlider
 from vocal10n.ui.widgets.term_file_list import TermFileList
@@ -57,7 +57,7 @@ class STTTab(QWidget):
         # ── Language ──────────────────────────────────────────────────
         lang_box = QGroupBox("Language")
         lb_lay = QHBoxLayout(lang_box)
-        self._lang_combo = QComboBox()
+        self._lang_combo = ArrowComboBox()
         for lang in Language:
             self._lang_combo.addItem(lang.display_name, lang.value)
         # Set current
