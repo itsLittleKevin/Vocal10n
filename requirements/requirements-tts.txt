@@ -1,0 +1,6 @@
+# Vocal10n — TTS Dependencies (Python 3.10, venv_tts)
+# GPT-SoVITS runs as a separate API server subprocess.
+# Dependencies are managed by vendor/GPT-SoVITS/requirements.txt
+#
+# This file is for reference only — use setup_env.ps1 to install.
+# See: vendor/GPT-SoVITS/requirements.txt

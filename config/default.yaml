@@ -1,0 +1,128 @@
+# Vocal10n — Pipeline Configuration
+# For RTX 3060 12GB — All components on single GPU
+#
+# VRAM Budget (12GB total):
+#   Whisper large-v3-turbo:  ~2.5GB
+#   Qwen3-4B Q4_K_M:        ~4.0GB
+#   GPT-SoVITS (fp16):      ~3.0GB
+#   Total:                   ~9.5GB (leaves ~2.5GB headroom)
+
+pipeline:
+  name: "Vocal10n"
+  target_latency_ms: 2500
+
+  # Component enable switches (all off by default)
+  enable_stt: false
+  enable_translation: false
+  enable_tts: false
+
+  # Translation modes
+  enable_pending_translation: true      # Translate pending text for display only
+  enable_confirmed_translation: true    # Translate confirmed text for TTS
+
+  # TTS source: "confirmed" | "pending" | "both"
+  tts_source: "confirmed"
+
+  # Batching / debounce
+  translation_debounce_ms: 150
+  confirmed_batch_delay_ms: 800
+  tts_queue_max_size: 10
+
+# --- STT (FasterWhisper) ---------------------------------------------------
+stt:
+  model_size: "large-v3-turbo"
+  device: "cuda"
+  compute_type: "int8_float16"
+
+  # Latency tuning
+  window_seconds: 6.5
+  confirm_threshold: 0.3
+  min_transcribe_duration: 0.3
+  max_segment_age: 2.0
+
+  # Audio capture
+  sample_rate: 16000
+  channels: 1
+  chunk_duration: 0.2
+
+  # Language: null = auto-detect, "zh", "en"
+  language: null
+  use_simplified_chinese: true
+
+# --- Translation (Qwen3-4B via llama-cpp) -----------------------------------
+translation:
+  model_path: "models/llm/Qwen3-4B-Instruct-2507.Q4_K_M.gguf"
+
+  # llama-cpp settings
+  n_gpu_layers: -1          # All layers on GPU
+  n_ctx: 128
+  n_batch: 8
+  n_threads: 4
+
+  # Generation
+  temperature: 0.0
+  top_k: 1
+  top_p: 1.0
+  max_tokens: 64
+
+  target_latency_ms: 200
+  target_language: "English"
+  auto_detect_source: true
+
+# --- TTS (GPT-SoVITS) ------------------------------------------------------
+tts:
+  api_host: "127.0.0.1"
+  api_port: 9880
+  api_timeout: 60
+
+  # Reference audio for voice cloning
+  ref_audio_path: "reference_audio/audio_03.wav"
+  ref_audio_text: "I'm really sorry you were put on hold, but unfortunately we've had heavy call volume today. But I'm back now, and I can definitely check rates and availability for you."
+  ref_audio_lang: "en"
+
+  output_lang: "en"
+
+  # Streaming / speed
+  streaming_mode: 3
+  speed_factor: 1.3
+
+  # Sampling
+  top_k: 5
+  top_p: 0.7
+  temperature: 0.5
+
+  text_split_method: "cut0"
+  batch_size: 1
+
+# --- Audio Output -----------------------------------------------------------
+audio_output:
+  device: null              # null = system default
+  sample_rate: 32000
+  buffer_size: 1024
+  crossfade_ms: 50
+
+# --- Languages --------------------------------------------------------------
+languages:
+  English: "en"
+  Chinese: "zh"
+  Japanese: "ja"
+  Korean: "ko"
+  Spanish: "es"
+  French: "fr"
+  German: "de"
+
+# --- OBS Overlay ------------------------------------------------------------
+obs:
+  host: "127.0.0.1"
+  port: 5124
+  enable_source_subtitle: true
+  enable_target_subtitle: true
+  font_family: "Noto Sans"
+  font_size_source: 28
+  font_size_target: 28
+
+# --- Logging ----------------------------------------------------------------
+logging:
+  level: "INFO"
+  show_latency: true
+  show_vram: true

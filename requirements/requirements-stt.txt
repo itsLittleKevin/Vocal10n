@@ -1,0 +1,22 @@
+# Vocal10n — STT Dependencies (Python 3.11, venv_stt)
+# Includes core deps
+-r requirements-core.txt
+
+# FasterWhisper STT engine
+faster-whisper>=1.0.0
+
+# Audio capture & processing
+sounddevice>=0.4.6
+soundfile>=0.12.1
+scipy>=1.11.0
+
+# Chinese text processing
+opencc-python-reimplemented>=0.1.7
+pypinyin>=0.49.0
+
+# OBS overlay server
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Async I/O
+aiohttp>=3.9.0

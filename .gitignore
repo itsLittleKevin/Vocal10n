@@ -1,0 +1,50 @@
+# === Virtual Environments ===
+venvs/
+venv*/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# === Models (large binaries) ===
+models/**
+!models/**/
+!models/**/.gitkeep
+*.gguf
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.whl
+
+# === Vendored code ===
+vendor/
+
+# === User data ===
+reference_audio/**
+!reference_audio/.gitkeep
+training/**
+!training/.gitkeep
+knowledge_base/*.db
+knowledge_base/*.index
+
+# === Output ===
+output/**
+!output/**/
+!output/**/.gitkeep
+*.wav
+*.srt
+
+# === Legacy prebuild ===
+Vocal10n-prebuild/
+
+# === IDE / OS ===
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
+# === Logs ===
+*.log
+logs/

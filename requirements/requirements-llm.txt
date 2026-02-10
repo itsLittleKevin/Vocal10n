@@ -1,0 +1,11 @@
+# Vocal10n — LLM Translation Dependencies (Python 3.11, venv_llm)
+# Includes core deps
+-r requirements-core.txt
+
+# Qwen3-4B inference via llama-cpp-python (CUDA)
+# Install with CUDA support:
+#   pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+llama-cpp-python>=0.2.77
+
+# System monitoring
+psutil>=5.9.0
