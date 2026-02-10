@@ -1,13 +1,16 @@
-"""GPU / VRAM monitoring via pynvml."""
+"""GPU / VRAM monitoring via nvidia-ml-py."""
 
 import logging
+import warnings
 from dataclasses import dataclass
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 try:
-    import pynvml  # provided by nvidia-ml-py
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*pynvml.*deprecated.*")
+        import pynvml  # provided by nvidia-ml-py
 
     _NVML_AVAILABLE = True
 except ImportError:
