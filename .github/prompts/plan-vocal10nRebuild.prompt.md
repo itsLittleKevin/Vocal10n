@@ -230,13 +230,14 @@ logs/
 - [ ] 4.7 — Test: standalone mode (manual input → translation output)
 
 ### Phase 5: TTS Module (GPT-SoVITS)
-- [ ] 5.1 — Copy GPT-SoVITS into `vendor/GPT-SoVITS/`
-- [ ] 5.2 — `tts/server_manager.py` — Subprocess launcher for GPT-SoVITS API
-- [ ] 5.3 — `tts/client.py` — HTTP client (port from prebuild's `tts_client.py`)
-- [ ] 5.4 — `tts/queue.py` — TTS queue with buffering logic
-- [ ] 5.5 — `tts/audio_output.py` — Playback with device selection
-- [ ] 5.6 — `ui/tabs/tts_tab.py` — TTS tab (source/target toggles, ref audio, device select, params)
-- [ ] 5.7 — Wire TTS to pipeline: translation events → synthesize → play
+- [x] 5.1 — Copy GPT-SoVITS into `vendor/GPT-SoVITS/`
+- [x] 5.2 — `tts/server_manager.py` — Subprocess launcher for GPT-SoVITS API
+- [x] 5.3 — `tts/client.py` — HTTP client (port from prebuild's `tts_client.py`)
+- [x] 5.4 — `tts/queue.py` — TTS queue with buffering logic
+- [x] 5.5 — `tts/audio_output.py` — Playback with device selection
+- [x] 5.6 — `ui/tabs/tts_tab.py` — TTS tab (source/target toggles, ref audio, device select, params)
+- [x] 5.7 — Wire TTS to pipeline: translation events → synthesize → play
+- [x] 5.7a — `tts/controller.py` — TTS controller (server lifecycle, queue, playback)
 - [ ] 5.8 — Test: end-to-end STT → LLM → TTS
 
 ### Phase 6: Pipeline Orchestration
