@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from vocal10n.constants import ModelStatus
 from vocal10n.llm.controller import LLMController
+from vocal10n.pipeline.coordinator import PipelineCoordinator
 from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
 from vocal10n.stt.controller import STTController
@@ -98,6 +99,21 @@ class MainWindow(QMainWindow):
         tts_tab.reference_changed.connect(self._tts_ctrl.set_reference_audio)
         tts_tab.output_device_changed.connect(self._tts_ctrl.set_output_device)
 
+        # ── Pipeline coordinator ─────────────────────────────────
+        self._coordinator = PipelineCoordinator(state, self._latency, parent=self)
+        self._coordinator.set_audio_capture(self._stt_ctrl.audio_capture)
+        self._coordinator.session_started.connect(
+            lambda: self.section_b.output_tab.set_session_active(True)
+        )
+        self._coordinator.session_stopped.connect(
+            lambda: self.section_b.output_tab.set_session_active(False)
+        )
+
+        # Output tab manual session buttons → coordinator
+        output_tab = self.section_b.output_tab
+        output_tab.start_session_requested.connect(self._coordinator.start_session)
+        output_tab.stop_session_requested.connect(self._coordinator.stop_session)
+
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)
 
@@ -165,18 +181,32 @@ class MainWindow(QMainWindow):
 
     def _on_latency_stats(self) -> None:
         stats = self._latency.get_all_stats()
-        for component in ("stt", "translation", "tts", "total"):
+        for component in ("stt", "translation", "tts"):
             s = stats.get(component)
             if s and s.count > 0:
                 self.section_a.update_latency(component, s.current_ms, s.avg_5s_ms)
-                if component == "total":
-                    self._sb_latency.setText(f"Latency: {s.current_ms:.0f} ms")
+
+        # Total: use explicit total if available, otherwise sum active components
+        total_s = stats.get("total")
+        if total_s and total_s.count > 0:
+            total_cur = total_s.current_ms
+            total_avg = total_s.avg_5s_ms
+        else:
+            parts = [stats[c] for c in ("stt", "translation", "tts") if stats[c].count > 0]
+            if parts:
+                total_cur = sum(p.current_ms for p in parts)
+                total_avg = sum(p.avg_5s_ms for p in parts)
+            else:
+                return
+        self.section_a.update_latency("total", total_cur, total_avg)
+        self._sb_latency.setText(f"Latency: {total_cur:.0f} ms")
 
     # ------------------------------------------------------------------
     # Shutdown
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
+        self._coordinator.shutdown()
         self._tts_ctrl.shutdown()
         self._llm_ctrl.shutdown()
         self._stt_ctrl.shutdown()

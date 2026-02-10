@@ -118,6 +118,9 @@ class STTController(QObject):
             self._engine.load()
             self._state.stt_status = ModelStatus.LOADED
             logger.info("STT model loaded: %s", model_name)
+            # Auto-start pipeline if STT was already enabled before model loaded
+            if self._state.stt_enabled:
+                self._start_pipeline()
         except Exception as e:
             self._state.stt_status = ModelStatus.ERROR
             logger.exception("Failed to load STT model: %s", e)
@@ -198,6 +201,11 @@ class STTController(QObject):
     # ------------------------------------------------------------------
     # Cleanup
     # ------------------------------------------------------------------
+
+    @property
+    def audio_capture(self) -> AudioCapture:
+        """Expose audio capture for WAV recording."""
+        return self._capture
 
     def shutdown(self) -> None:
         """Graceful shutdown — stop everything."""

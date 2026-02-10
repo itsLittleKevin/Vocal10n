@@ -132,6 +132,15 @@ obs:
   font_size_source: 28
   font_size_target: 28
 
+# --- Output Files -----------------------------------------------------------
+output:
+  save_source_txt: false    # Corrected source transcript with punctuation
+  save_source_srt: false    # Corrected source SRT (no punctuation, space-separated)
+  save_target_txt: false    # Translated text with punctuation
+  save_target_srt: false    # Translated SRT (no punctuation, space-separated)
+  save_wav: false           # Raw microphone audio (16 kHz mono WAV)
+  directory: "output"
+
 # --- Logging ----------------------------------------------------------------
 logging:
   level: "INFO"

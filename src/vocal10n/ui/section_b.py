@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QScrollArea, QTabWidget, QVBoxLayout, QWidget
 
 from vocal10n.state import SystemState
+from vocal10n.ui.tabs.output_tab import OutputTab
 from vocal10n.ui.tabs.stt_tab import STTTab
 from vocal10n.ui.tabs.translation_tab import TranslationTab
 from vocal10n.ui.tabs.tts_tab import TTSTab
@@ -53,7 +54,9 @@ class SectionB(QTabWidget):
         self.tts_tab = TTSTab(state)
         self.addTab(_scrollable(self.tts_tab), "TTS")
 
-        self.addTab(_placeholder("Output settings will appear here (Phase 6)"), "Output")
+        # Phase 6: real Output tab
+        self.output_tab = OutputTab(state)
+        self.addTab(_scrollable(self.output_tab), "Output")
         self.addTab(_placeholder("OBS overlay settings will appear here (Phase 7)"), "OBS")
         self.addTab(
             _placeholder("Training tools will appear here (Phase 8)"), "Training"
