@@ -123,6 +123,67 @@ class OBSTab(QWidget):
         size_row_src.addWidget(self._src_color_btn)
 
         src_lay.addLayout(size_row_src)
+
+        # Stroke
+        stroke_row_src = QHBoxLayout()
+        stroke_row_src.addWidget(QLabel("Stroke:"))
+        self._src_stroke_w_spin = QSpinBox()
+        self._src_stroke_w_spin.setRange(0, 20)
+        self._src_stroke_w_spin.setValue(int(self._cfg.get("obs.stroke_width_source", 2)))
+        self._src_stroke_w_spin.setSuffix(" px")
+        self._src_stroke_w_spin.valueChanged.connect(
+            lambda v: self._on_size("obs.stroke_width_source", v)
+        )
+        stroke_row_src.addWidget(self._src_stroke_w_spin)
+        stroke_row_src.addWidget(QLabel("Color:"))
+        self._src_stroke_color_btn = QPushButton()
+        self._src_stroke_color = self._cfg.get("obs.stroke_color_source", "#000000")
+        self._src_stroke_color_btn.setFixedSize(36, 28)
+        self._update_color_btn(self._src_stroke_color_btn, self._src_stroke_color)
+        self._src_stroke_color_btn.clicked.connect(lambda: self._pick_color("stroke_source"))
+        stroke_row_src.addWidget(self._src_stroke_color_btn)
+        stroke_row_src.addStretch()
+        src_lay.addLayout(stroke_row_src)
+
+        # Shadow
+        shadow_row_src = QHBoxLayout()
+        shadow_row_src.addWidget(QLabel("Shadow:"))
+        self._src_shadow_color_btn = QPushButton()
+        self._src_shadow_color = self._cfg.get("obs.shadow_color_source", "#000000")
+        self._src_shadow_color_btn.setFixedSize(36, 28)
+        self._update_color_btn(self._src_shadow_color_btn, self._src_shadow_color)
+        self._src_shadow_color_btn.clicked.connect(lambda: self._pick_color("shadow_source"))
+        shadow_row_src.addWidget(self._src_shadow_color_btn)
+        shadow_row_src.addWidget(QLabel("X:"))
+        self._src_shadow_x = QSpinBox()
+        self._src_shadow_x.setRange(-50, 50)
+        self._src_shadow_x.setValue(int(self._cfg.get("obs.shadow_x_source", 0)))
+        self._src_shadow_x.setSuffix(" px")
+        self._src_shadow_x.valueChanged.connect(lambda v: self._on_size("obs.shadow_x_source", v))
+        shadow_row_src.addWidget(self._src_shadow_x)
+        shadow_row_src.addWidget(QLabel("Y:"))
+        self._src_shadow_y = QSpinBox()
+        self._src_shadow_y.setRange(-50, 50)
+        self._src_shadow_y.setValue(int(self._cfg.get("obs.shadow_y_source", 2)))
+        self._src_shadow_y.setSuffix(" px")
+        self._src_shadow_y.valueChanged.connect(lambda v: self._on_size("obs.shadow_y_source", v))
+        shadow_row_src.addWidget(self._src_shadow_y)
+        shadow_row_src.addWidget(QLabel("Blur:"))
+        self._src_shadow_blur = QSpinBox()
+        self._src_shadow_blur.setRange(0, 50)
+        self._src_shadow_blur.setValue(int(self._cfg.get("obs.shadow_blur_source", 4)))
+        self._src_shadow_blur.setSuffix(" px")
+        self._src_shadow_blur.valueChanged.connect(lambda v: self._on_size("obs.shadow_blur_source", v))
+        shadow_row_src.addWidget(self._src_shadow_blur)
+        shadow_row_src.addWidget(QLabel("Opacity:"))
+        self._src_shadow_opacity = QSpinBox()
+        self._src_shadow_opacity.setRange(0, 100)
+        self._src_shadow_opacity.setValue(int(self._cfg.get("obs.shadow_opacity_source", 80)))
+        self._src_shadow_opacity.setSuffix(" %")
+        self._src_shadow_opacity.valueChanged.connect(lambda v: self._on_size("obs.shadow_opacity_source", v))
+        shadow_row_src.addWidget(self._src_shadow_opacity)
+        src_lay.addLayout(shadow_row_src)
+
         root.addWidget(src_box)
 
         # ── Target Subtitle ───────────────────────────────────────────
@@ -177,6 +238,67 @@ class OBSTab(QWidget):
         size_row_tgt.addWidget(self._tgt_color_btn)
 
         tgt_lay.addLayout(size_row_tgt)
+
+        # Stroke
+        stroke_row_tgt = QHBoxLayout()
+        stroke_row_tgt.addWidget(QLabel("Stroke:"))
+        self._tgt_stroke_w_spin = QSpinBox()
+        self._tgt_stroke_w_spin.setRange(0, 20)
+        self._tgt_stroke_w_spin.setValue(int(self._cfg.get("obs.stroke_width_target", 2)))
+        self._tgt_stroke_w_spin.setSuffix(" px")
+        self._tgt_stroke_w_spin.valueChanged.connect(
+            lambda v: self._on_size("obs.stroke_width_target", v)
+        )
+        stroke_row_tgt.addWidget(self._tgt_stroke_w_spin)
+        stroke_row_tgt.addWidget(QLabel("Color:"))
+        self._tgt_stroke_color_btn = QPushButton()
+        self._tgt_stroke_color = self._cfg.get("obs.stroke_color_target", "#000000")
+        self._tgt_stroke_color_btn.setFixedSize(36, 28)
+        self._update_color_btn(self._tgt_stroke_color_btn, self._tgt_stroke_color)
+        self._tgt_stroke_color_btn.clicked.connect(lambda: self._pick_color("stroke_target"))
+        stroke_row_tgt.addWidget(self._tgt_stroke_color_btn)
+        stroke_row_tgt.addStretch()
+        tgt_lay.addLayout(stroke_row_tgt)
+
+        # Shadow
+        shadow_row_tgt = QHBoxLayout()
+        shadow_row_tgt.addWidget(QLabel("Shadow:"))
+        self._tgt_shadow_color_btn = QPushButton()
+        self._tgt_shadow_color = self._cfg.get("obs.shadow_color_target", "#000000")
+        self._tgt_shadow_color_btn.setFixedSize(36, 28)
+        self._update_color_btn(self._tgt_shadow_color_btn, self._tgt_shadow_color)
+        self._tgt_shadow_color_btn.clicked.connect(lambda: self._pick_color("shadow_target"))
+        shadow_row_tgt.addWidget(self._tgt_shadow_color_btn)
+        shadow_row_tgt.addWidget(QLabel("X:"))
+        self._tgt_shadow_x = QSpinBox()
+        self._tgt_shadow_x.setRange(-50, 50)
+        self._tgt_shadow_x.setValue(int(self._cfg.get("obs.shadow_x_target", 0)))
+        self._tgt_shadow_x.setSuffix(" px")
+        self._tgt_shadow_x.valueChanged.connect(lambda v: self._on_size("obs.shadow_x_target", v))
+        shadow_row_tgt.addWidget(self._tgt_shadow_x)
+        shadow_row_tgt.addWidget(QLabel("Y:"))
+        self._tgt_shadow_y = QSpinBox()
+        self._tgt_shadow_y.setRange(-50, 50)
+        self._tgt_shadow_y.setValue(int(self._cfg.get("obs.shadow_y_target", 2)))
+        self._tgt_shadow_y.setSuffix(" px")
+        self._tgt_shadow_y.valueChanged.connect(lambda v: self._on_size("obs.shadow_y_target", v))
+        shadow_row_tgt.addWidget(self._tgt_shadow_y)
+        shadow_row_tgt.addWidget(QLabel("Blur:"))
+        self._tgt_shadow_blur = QSpinBox()
+        self._tgt_shadow_blur.setRange(0, 50)
+        self._tgt_shadow_blur.setValue(int(self._cfg.get("obs.shadow_blur_target", 4)))
+        self._tgt_shadow_blur.setSuffix(" px")
+        self._tgt_shadow_blur.valueChanged.connect(lambda v: self._on_size("obs.shadow_blur_target", v))
+        shadow_row_tgt.addWidget(self._tgt_shadow_blur)
+        shadow_row_tgt.addWidget(QLabel("Opacity:"))
+        self._tgt_shadow_opacity = QSpinBox()
+        self._tgt_shadow_opacity.setRange(0, 100)
+        self._tgt_shadow_opacity.setValue(int(self._cfg.get("obs.shadow_opacity_target", 80)))
+        self._tgt_shadow_opacity.setSuffix(" %")
+        self._tgt_shadow_opacity.valueChanged.connect(lambda v: self._on_size("obs.shadow_opacity_target", v))
+        shadow_row_tgt.addWidget(self._tgt_shadow_opacity)
+        tgt_lay.addLayout(shadow_row_tgt)
+
         root.addWidget(tgt_box)
 
         # ── Preview ───────────────────────────────────────────────────
@@ -260,10 +382,16 @@ class OBSTab(QWidget):
         self.settings_changed.emit()
 
     def _pick_color(self, which: str) -> None:
-        if which == "source":
-            initial = self._src_color
-        else:
-            initial = self._tgt_color
+        _COLOR_MAP = {
+            "source": ("_src_color", "obs.color_source", "_src_color_btn"),
+            "target": ("_tgt_color", "obs.color_target", "_tgt_color_btn"),
+            "stroke_source": ("_src_stroke_color", "obs.stroke_color_source", "_src_stroke_color_btn"),
+            "stroke_target": ("_tgt_stroke_color", "obs.stroke_color_target", "_tgt_stroke_color_btn"),
+            "shadow_source": ("_src_shadow_color", "obs.shadow_color_source", "_src_shadow_color_btn"),
+            "shadow_target": ("_tgt_shadow_color", "obs.shadow_color_target", "_tgt_shadow_color_btn"),
+        }
+        attr, cfg_key, btn_attr = _COLOR_MAP[which]
+        initial = getattr(self, attr)
 
         from PySide6.QtGui import QColor
         color = QColorDialog.getColor(QColor(initial), self, f"Pick {which} color")
@@ -271,14 +399,9 @@ class OBSTab(QWidget):
             return
 
         hex_color = color.name()
-        if which == "source":
-            self._src_color = hex_color
-            self._cfg.set("obs.color_source", hex_color)
-            self._update_color_btn(self._src_color_btn, hex_color)
-        else:
-            self._tgt_color = hex_color
-            self._cfg.set("obs.color_target", hex_color)
-            self._update_color_btn(self._tgt_color_btn, hex_color)
+        setattr(self, attr, hex_color)
+        self._cfg.set(cfg_key, hex_color)
+        self._update_color_btn(getattr(self, btn_attr), hex_color)
 
         self._update_preview()
         self.settings_changed.emit()
@@ -310,19 +433,54 @@ class OBSTab(QWidget):
         preview_src_size = min(src_size, 36)
         preview_tgt_size = min(tgt_size, 36)
 
+        src_shadow_css = self._combined_preview_shadow("source")
+        tgt_shadow_css = self._combined_preview_shadow("target")
+
         self._preview_src_label.setText(src_text if src_enabled else "")
         self._preview_src_label.setVisible(src_enabled)
         self._preview_src_label.setStyleSheet(
             f"color: {src_color}; font-family: '{src_font}'; "
-            f"font-size: {preview_src_size}px; font-weight: 600;"
+            f"font-size: {preview_src_size}px; font-weight: 600; "
+            f"text-shadow: {src_shadow_css};"
         )
 
         self._preview_tgt_label.setText(tgt_text if tgt_enabled else "")
         self._preview_tgt_label.setVisible(tgt_enabled)
         self._preview_tgt_label.setStyleSheet(
             f"color: {tgt_color}; font-family: '{tgt_font}'; "
-            f"font-size: {preview_tgt_size}px; font-weight: 600;"
+            f"font-size: {preview_tgt_size}px; font-weight: 600; "
+            f"text-shadow: {tgt_shadow_css};"
         )
+
+    def _combined_preview_shadow(self, which: str) -> str:
+        """Build combined outline + drop-shadow for Qt preview."""
+        cfg = self._cfg
+        parts: list[str] = []
+
+        # Outline via multi-directional 0-blur shadows
+        stroke_w = int(cfg.get(f"obs.stroke_width_{which}", 2))
+        stroke_c = cfg.get(f"obs.stroke_color_{which}", "#000000")
+        if stroke_w > 0:
+            for dx, dy in [
+                (-1, -1), (0, -1), (1, -1),
+                (-1,  0),          (1,  0),
+                (-1,  1), (0,  1), (1,  1),
+            ]:
+                parts.append(
+                    f"{dx * stroke_w}px {dy * stroke_w}px 0 {stroke_c}"
+                )
+
+        # Drop shadow
+        x = int(cfg.get(f"obs.shadow_x_{which}", 0))
+        y = int(cfg.get(f"obs.shadow_y_{which}", 2))
+        blur = int(cfg.get(f"obs.shadow_blur_{which}", 4))
+        opacity = int(cfg.get(f"obs.shadow_opacity_{which}", 80))
+        color = cfg.get(f"obs.shadow_color_{which}", "#000000")
+        r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+        a = opacity / 100.0
+        parts.append(f"{x}px {y}px {blur}px rgba({r},{g},{b},{a:.2f})")
+
+        return ", ".join(parts)
 
     @staticmethod
     def _update_color_btn(btn: QPushButton, hex_color: str) -> None:

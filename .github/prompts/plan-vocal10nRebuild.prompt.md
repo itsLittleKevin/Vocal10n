@@ -248,10 +248,10 @@ logs/
 - [x] 6.5 — Test: full pipeline with all outputs enabled
 
 ### Phase 7: OBS Integration
-- [ ] 7.1 — `obs/server.py` — Flask HTTP server for Browser Source
-- [ ] 7.2 — `obs/overlay.html` — HTML/CSS subtitle overlay (port from prebuild)
-- [ ] 7.3 — `ui/tabs/obs_tab.py` — OBS tab (font, size, styling, preview)
-- [ ] 7.4 — Test: OBS Browser Source displays live subtitles
+- [x] 7.1 — `obs/server.py` — Flask HTTP server for Browser Source
+- [x] 7.2 — `obs/overlay.html` — HTML/CSS subtitle overlay (port from prebuild)
+- [x] 7.3 — `ui/tabs/obs_tab.py` — OBS tab (font, size, styling, preview)
+- [x] 7.4 — Test: OBS Browser Source displays live subtitles
 
 ### Phase 8: Launch Scripts & Polish
 - [ ] 8.1 — `start.ps1` / `start.bat` — Launch TTS server + main app

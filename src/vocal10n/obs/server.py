@@ -56,7 +56,7 @@ class OBSSubtitleServer:
         self._lock = threading.Lock()
 
         # Auto-clear timeout (seconds of no change → clear)
-        self._clear_timeout: float = 4.0
+        self._clear_timeout: float = 2.5
 
         # Flask app
         self._app = Flask(__name__)
@@ -155,23 +155,35 @@ class OBSSubtitleServer:
     # ------------------------------------------------------------------
 
     def _on_stt_pending(self, event: TextEvent) -> None:
+        text = (event.text or "").strip()
+        if not text:
+            return  # ignore blanks; let the clear timeout handle removal
         with self._lock:
-            self._source_text = event.text or ""
+            self._source_text = text
             self._source_updated_at = time.time()
 
     def _on_stt_confirmed(self, event: TextEvent) -> None:
+        text = (event.text or "").strip()
+        if not text:
+            return
         with self._lock:
-            self._source_text = event.text or ""
+            self._source_text = text
             self._source_updated_at = time.time()
 
     def _on_translation_pending(self, event: TranslationEvent) -> None:
+        text = (event.translated_text or "").strip()
+        if not text:
+            return
         with self._lock:
-            self._target_text = event.translated_text or ""
+            self._target_text = text
             self._target_updated_at = time.time()
 
     def _on_translation_confirmed(self, event: TranslationEvent) -> None:
+        text = (event.translated_text or "").strip()
+        if not text:
+            return
         with self._lock:
-            self._target_text = event.translated_text or ""
+            self._target_text = text
             self._target_updated_at = time.time()
 
     # ------------------------------------------------------------------
@@ -213,10 +225,12 @@ class OBSSubtitleServer:
         src_enabled = cfg.get("obs.enable_source_subtitle", True)
         tgt_enabled = cfg.get("obs.enable_target_subtitle", True)
 
-        # When only one line is enabled, center it vertically
-        # by hiding the other and adjusting the container
         src_display = "block" if src_enabled else "none"
         tgt_display = "block" if tgt_enabled else "none"
+
+        # Combined outline (stroke) + drop shadow
+        src_shadow = self._combined_shadow_css("source")
+        tgt_shadow = self._combined_shadow_css("target")
 
         return f""":root {{
     --src-font-family: '{src_font}', 'Microsoft YaHei', sans-serif;
@@ -231,14 +245,54 @@ class OBSSubtitleServer:
     font-family: var(--src-font-family);
     font-size: var(--src-font-size);
     color: var(--src-color);
+    text-shadow: {src_shadow};
+    paint-order: stroke fill;
 }}
 .translation-text {{
     display: {tgt_display};
     font-family: var(--tgt-font-family);
     font-size: var(--tgt-font-size);
     color: var(--tgt-color);
+    text-shadow: {tgt_shadow};
+    paint-order: stroke fill;
 }}
 """
+
+    def _combined_shadow_css(self, which: str) -> str:
+        """Build combined outline + drop-shadow text-shadow for *which*.
+
+        Uses multi-directional 0-blur shadows for the outline instead of
+        ``-webkit-text-stroke`` so CJK glyphs don't show internal overlaps.
+        """
+        cfg = self._cfg
+        parts: list[str] = []
+
+        # Outline (stroke) — 8-direction shadows at 0 blur
+        stroke_w = int(cfg.get(f"obs.stroke_width_{which}", 2))
+        stroke_c = cfg.get(f"obs.stroke_color_{which}", "#000000")
+        if stroke_w > 0:
+            for dx, dy in [
+                (-1, -1), (0, -1), (1, -1),
+                (-1,  0),          (1,  0),
+                (-1,  1), (0,  1), (1,  1),
+            ]:
+                parts.append(
+                    f"{dx * stroke_w}px {dy * stroke_w}px 0 {stroke_c}"
+                )
+
+        # Drop shadow
+        x = int(cfg.get(f"obs.shadow_x_{which}", 0))
+        y = int(cfg.get(f"obs.shadow_y_{which}", 2))
+        blur = int(cfg.get(f"obs.shadow_blur_{which}", 4))
+        opacity = int(cfg.get(f"obs.shadow_opacity_{which}", 80))
+        color = cfg.get(f"obs.shadow_color_{which}", "#000000")
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+        a = opacity / 100.0
+        parts.append(f"{x}px {y}px {blur}px rgba({r},{g},{b},{a:.2f})")
+
+        return ", ".join(parts)
 
     # ------------------------------------------------------------------
     # Internal

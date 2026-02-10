@@ -135,6 +135,24 @@ obs:
   color_source: "#FFFFFF"
   color_target: "#FFE066"
 
+  # Stroke (text outline via -webkit-text-stroke)
+  stroke_width_source: 2        # px
+  stroke_color_source: "#000000"
+  stroke_width_target: 2
+  stroke_color_target: "#000000"
+
+  # Shadow (CSS text-shadow)
+  shadow_color_source: "#000000"
+  shadow_x_source: 0            # px offset
+  shadow_y_source: 2
+  shadow_blur_source: 4         # px blur radius
+  shadow_opacity_source: 80     # 0-100 %
+  shadow_color_target: "#000000"
+  shadow_x_target: 0
+  shadow_y_target: 2
+  shadow_blur_target: 4
+  shadow_opacity_target: 80
+
 # --- Output Files -----------------------------------------------------------
 output:
   save_source_txt: false    # Corrected source transcript with punctuation

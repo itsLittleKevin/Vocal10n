@@ -15,9 +15,6 @@
             --tgt-font-size: 28px;
             --src-color: #FFFFFF;
             --tgt-color: #FFE066;
-            --text-shadow: 0 -2px 0 #000, 2px -2px 0 #000, 2px 0 0 #000,
-                           2px 2px 0 #000, 0 2px 0 #000, -2px 2px 0 #000,
-                           -2px 0 0 #000, -2px -2px 0 #000;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -42,7 +39,6 @@
         .subtitle-line {
             font-weight: 600;
             line-height: 1.4;
-            text-shadow: var(--text-shadow);
             margin-bottom: 8px;
             transition: opacity 0.2s ease;
         }
@@ -88,7 +84,6 @@
             styleUrl:       '/style.css',
             pollInterval:   200,   // subtitle poll (ms)
             stylePoll:      2000,  // CSS reload (ms)
-            hideAfterMs:    4000,  // auto-hide after no change
         };
 
         const srcEl   = document.getElementById('source');
@@ -96,7 +91,6 @@
         const statEl  = document.getElementById('status');
 
         let lastSrc = '', lastTgt = '';
-        let hideTimer = null;
 
         function setStatus(ok) {
             statEl.className = 'status ' + (ok ? 'connected' : 'disconnected');
@@ -111,17 +105,9 @@
             srcEl.textContent = src || '';
             tgtEl.textContent = tgt || '';
 
+            // Server controls timing — just show/hide based on content
             srcEl.classList.toggle('hidden', !src);
             tgtEl.classList.toggle('hidden', !tgt);
-
-            // Reset auto-hide timer
-            if (hideTimer) clearTimeout(hideTimer);
-            if (src || tgt) {
-                hideTimer = setTimeout(() => {
-                    srcEl.classList.add('hidden');
-                    tgtEl.classList.add('hidden');
-                }, CONFIG.hideAfterMs);
-            }
         }
 
         async function poll() {
