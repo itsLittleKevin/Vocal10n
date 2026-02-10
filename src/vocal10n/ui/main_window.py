@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vocal10n.llm.controller import LLMController
 from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
 from vocal10n.stt.controller import STTController
@@ -71,7 +72,14 @@ class MainWindow(QMainWindow):
         stt_tab._model_sel.load_requested.connect(self._stt_ctrl.load_model)
         stt_tab._model_sel.unload_requested.connect(self._stt_ctrl.unload_model)
         stt_tab.term_files_changed.connect(self._stt_ctrl.update_term_files)
+        # ── LLM controller ────────────────────────────────────────────
+        self._llm_ctrl = LLMController(state, self._latency, parent=self)
 
+        # Connect Translation tab load/unload → controller
+        trans_tab = self.section_b.translation_tab
+        trans_tab._model_sel.load_requested.connect(self._llm_ctrl.load_model)
+        trans_tab._model_sel.unload_requested.connect(self._llm_ctrl.unload_model)
+        trans_tab.target_language_changed.connect(self._llm_ctrl.set_target_language)
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)
 
@@ -137,5 +145,6 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
+        self._llm_ctrl.shutdown()
         self._stt_ctrl.shutdown()
         super().closeEvent(event)

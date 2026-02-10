@@ -40,7 +40,8 @@ class ParamSlider(QWidget):
         self._step = step
         self._suffix = suffix
 
-        self._multiplier = round(1.0 / step)
+        self._multiplier = round(1.0 / step) if step < 1.0 else 1
+        self._int_step = int(step) if step >= 1.0 else 1
 
         # --- layout ---
         root = QVBoxLayout(self)
@@ -71,7 +72,7 @@ class ParamSlider(QWidget):
         self._slider = QSlider(Qt.Horizontal)
         self._slider.setMinimum(int(minimum * self._multiplier))
         self._slider.setMaximum(int(maximum * self._multiplier))
-        self._slider.setSingleStep(1)
+        self._slider.setSingleStep(self._int_step if step >= 1.0 else 1)
         self._slider.setValue(int(default * self._multiplier))
         self._slider.valueChanged.connect(self._on_slider_changed)
         root.addWidget(self._slider)

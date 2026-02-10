@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from vocal10n.state import SystemState
 from vocal10n.ui.tabs.stt_tab import STTTab
+from vocal10n.ui.tabs.translation_tab import TranslationTab
 
 
 def _placeholder(text: str) -> QWidget:
@@ -32,11 +33,9 @@ class SectionB(QTabWidget):
         self.stt_tab = STTTab(state)
         self.addTab(self.stt_tab, "STT")
 
-        # Placeholders — will be replaced in Phases 4-8
-        self.addTab(
-            _placeholder("Translation settings will appear here (Phase 4)"),
-            "Translation",
-        )
+        # Phase 4: real Translation tab
+        self.translation_tab = TranslationTab(state)
+        self.addTab(self.translation_tab, "Translation")
         self.addTab(_placeholder("TTS settings will appear here (Phase 5)"), "TTS")
         self.addTab(_placeholder("Output settings will appear here (Phase 6)"), "Output")
         self.addTab(_placeholder("OBS overlay settings will appear here (Phase 7)"), "OBS")
