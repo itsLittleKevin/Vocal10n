@@ -1,8 +1,19 @@
 """Knowledge Base tab for Section B.
 
-Manages glossary files in ``knowledge_base/`` that feed into the
-STT corrector and translation prompt.  Also hosts STT recognition
-context (term files for phonetic correction + Whisper initial_prompt).
+Manages two parallel systems:
+
+1. **Translation Glossary** (``knowledge_base/*.txt``)
+   Format: ``source_term|translation`` per line.
+   Used by the Corrector for fuzzy pinyin matching + translation prompt
+   injection.  Switches to RAG vector search when term count exceeds
+   threshold.
+
+2. **STT Recognition Context** (``stt_terms/*.txt``)
+   Format: one plain term per line.
+   Fed into Whisper's ``initial_prompt`` to bias recognition toward
+   domain-specific vocabulary.
+
+Both systems present a consistent file-table + inline-editor UI.
 """
 
 from __future__ import annotations
@@ -31,16 +42,16 @@ from PySide6.QtWidgets import (
 from vocal10n.config import get_config
 from vocal10n.state import SystemState
 from vocal10n.ui.widgets.param_slider import ParamSlider
-from vocal10n.ui.widgets.term_file_list import TermFileList
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
 _KB_DIR = _PROJECT_ROOT / "knowledge_base"
+_STT_TERMS_DIR = _PROJECT_ROOT / "stt_terms"
 
 
 class KnowledgeBaseTab(QWidget):
-    """Manages glossary files, RAG settings, and STT recognition context."""
+    """Manages translation glossary and STT recognition term files."""
 
     glossary_changed = Signal()  # emitted when glossaries are modified
     term_files_changed = Signal(list)  # emits list[str] of STT term file paths
@@ -49,7 +60,10 @@ class KnowledgeBaseTab(QWidget):
         super().__init__(parent)
         self._state = state
         self._cfg = get_config()
-        self._current_file: Path | None = None
+
+        # Track current file for each system
+        self._gloss_current: Path | None = None
+        self._stt_current: Path | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
@@ -61,175 +75,227 @@ class KnowledgeBaseTab(QWidget):
         root.addWidget(header)
 
         desc = QLabel(
-            "Glossary files improve STT correction and translation accuracy. "
-            "Terms are fuzzy-matched against speech output and injected as "
-            "hints into the translation prompt."
+            "Two systems work together to improve accuracy:<br>"
+            "<b>Translation Glossary</b> — fixes STT errors and guides "
+            "translation (post-recognition).<br>"
+            "<b>STT Recognition Terms</b> — biases Whisper to hear "
+            "domain words correctly (during recognition)."
         )
         desc.setWordWrap(True)
         desc.setStyleSheet("color: #8892a4; font-size: 12px; margin-bottom: 4px;")
         root.addWidget(desc)
 
-        # ── Glossary Files ────────────────────────────────────────────
-        files_box = QGroupBox("Glossary Files")
-        fl = QVBoxLayout(files_box)
+        # ══════════════════════════════════════════════════════════════
+        # SECTION A: Translation Glossary  (knowledge_base/*.txt)
+        # ══════════════════════════════════════════════════════════════
+        gloss_box = QGroupBox(
+            "Translation Glossary  —  knowledge_base/*.txt"
+        )
+        gl = QVBoxLayout(gloss_box)
 
-        # File list table
-        self._file_table = QTableWidget(0, 3)
-        self._file_table.setHorizontalHeaderLabels(["File", "Terms", "Status"])
-        self._file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self._file_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self._file_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self._file_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self._file_table.setSelectionMode(QTableWidget.SingleSelection)
-        self._file_table.setMaximumHeight(150)
-        self._file_table.verticalHeader().setVisible(False)
-        self._file_table.currentCellChanged.connect(self._on_file_selected)
-        fl.addWidget(self._file_table)
+        gloss_info = QLabel(
+            "Format: <b>source_term|translation</b> per line. "
+            "Used after STT to correct errors and inject hints into "
+            "the LLM translation prompt."
+        )
+        gloss_info.setWordWrap(True)
+        gloss_info.setStyleSheet("color: #8892a4; font-size: 11px;")
+        gl.addWidget(gloss_info)
 
-        # File action buttons
-        btn_row = QHBoxLayout()
-        self._btn_new = QPushButton("New Glossary")
-        self._btn_new.setFixedWidth(110)
-        self._btn_new.clicked.connect(self._on_new_glossary)
-        btn_row.addWidget(self._btn_new)
+        # File table
+        self._gloss_table = QTableWidget(0, 3)
+        self._gloss_table.setHorizontalHeaderLabels(["File", "Terms", "Status"])
+        self._gloss_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.Stretch
+        )
+        self._gloss_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents
+        )
+        self._gloss_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents
+        )
+        self._gloss_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._gloss_table.setSelectionMode(QTableWidget.SingleSelection)
+        self._gloss_table.setMaximumHeight(120)
+        self._gloss_table.verticalHeader().setVisible(False)
+        self._gloss_table.currentCellChanged.connect(self._on_gloss_file_selected)
+        gl.addWidget(self._gloss_table)
 
-        self._btn_import = QPushButton("Import File")
-        self._btn_import.setFixedWidth(100)
-        self._btn_import.clicked.connect(self._on_import_file)
-        btn_row.addWidget(self._btn_import)
+        # Buttons row
+        gbtn = QHBoxLayout()
+        self._btn_gloss_new = QPushButton("New")
+        self._btn_gloss_new.setFixedWidth(60)
+        self._btn_gloss_new.clicked.connect(self._on_gloss_new)
+        gbtn.addWidget(self._btn_gloss_new)
 
-        self._btn_delete = QPushButton("Delete")
-        self._btn_delete.setFixedWidth(70)
-        self._btn_delete.setEnabled(False)
-        self._btn_delete.clicked.connect(self._on_delete_file)
-        btn_row.addWidget(self._btn_delete)
+        self._btn_gloss_import = QPushButton("Import")
+        self._btn_gloss_import.setFixedWidth(70)
+        self._btn_gloss_import.clicked.connect(self._on_gloss_import)
+        gbtn.addWidget(self._btn_gloss_import)
 
-        btn_row.addStretch()
+        self._btn_gloss_delete = QPushButton("Delete")
+        self._btn_gloss_delete.setFixedWidth(60)
+        self._btn_gloss_delete.setEnabled(False)
+        self._btn_gloss_delete.clicked.connect(self._on_gloss_delete)
+        gbtn.addWidget(self._btn_gloss_delete)
 
-        # RAG status
+        gbtn.addStretch()
+
         self._rag_label = QLabel("RAG: inactive")
         self._rag_label.setStyleSheet("color: #8892a4; font-size: 11px;")
-        btn_row.addWidget(self._rag_label)
-        fl.addLayout(btn_row)
+        gbtn.addWidget(self._rag_label)
+        gl.addLayout(gbtn)
 
-        root.addWidget(files_box)
-
-        # ── Term Editor ───────────────────────────────────────────────
-        editor_box = QGroupBox("Term Editor")
-        el = QVBoxLayout(editor_box)
-
-        format_info = QLabel(
-            "Format: <b>source_term|translation</b> (one per line). "
-            "Lines starting with <b>#</b> are comments."
-        )
-        format_info.setWordWrap(True)
-        format_info.setStyleSheet("color: #8892a4; font-size: 11px;")
-        el.addWidget(format_info)
-
-        self._editor = QTextEdit()
-        self._editor.setPlaceholderText(
+        # Editor
+        self._gloss_editor = QTextEdit()
+        self._gloss_editor.setPlaceholderText(
             "# Example glossary\n"
             "# source_term|preferred_translation\n"
             "科技小院|Science and Technology Backyard\n"
             "中国农业大学|China Agricultural University"
         )
-        self._editor.setMinimumHeight(200)
-        self._editor.setStyleSheet("font-family: 'Consolas', 'Courier New', monospace; font-size: 12px;")
-        el.addWidget(self._editor)
-
-        # Editor buttons
-        ed_btn_row = QHBoxLayout()
-        self._btn_save = QPushButton("Save")
-        self._btn_save.setProperty("accent", True)
-        self._btn_save.setFixedWidth(80)
-        self._btn_save.setEnabled(False)
-        self._btn_save.clicked.connect(self._on_save)
-        ed_btn_row.addWidget(self._btn_save)
-
-        self._btn_revert = QPushButton("Revert")
-        self._btn_revert.setFixedWidth(80)
-        self._btn_revert.setEnabled(False)
-        self._btn_revert.clicked.connect(self._on_revert)
-        ed_btn_row.addWidget(self._btn_revert)
-
-        ed_btn_row.addStretch()
-
-        self._term_count_label = QLabel("")
-        self._term_count_label.setStyleSheet("color: #8892a4; font-size: 11px;")
-        ed_btn_row.addWidget(self._term_count_label)
-        el.addLayout(ed_btn_row)
-
-        root.addWidget(editor_box)
-
-        # ── Quick Add ─────────────────────────────────────────────────
-        quick_box = QGroupBox("Quick Add Term")
-        ql = QHBoxLayout(quick_box)
-        ql.addWidget(QLabel("Term:"))
-        self._quick_term = QLineEdit()
-        self._quick_term.setPlaceholderText("source term")
-        ql.addWidget(self._quick_term, stretch=2)
-        ql.addWidget(QLabel("Translation:"))
-        self._quick_trans = QLineEdit()
-        self._quick_trans.setPlaceholderText("preferred translation")
-        ql.addWidget(self._quick_trans, stretch=2)
-        self._btn_quick_add = QPushButton("Add")
-        self._btn_quick_add.setFixedWidth(60)
-        self._btn_quick_add.clicked.connect(self._on_quick_add)
-        ql.addWidget(self._btn_quick_add)
-        root.addWidget(quick_box)
-
-        # ── RAG Settings ─────────────────────────────────────────────
-        rag_box = QGroupBox("Vector Retrieval (RAG)")
-        rl = QVBoxLayout(rag_box)
-
-        rag_desc = QLabel(
-            "When glossary exceeds the threshold below, the system automatically "
-            "switches from pinyin matching to vector-based retrieval (FAISS + MiniLM). "
-            "Requires: pip install sentence-transformers faiss-cpu"
+        self._gloss_editor.setMinimumHeight(140)
+        self._gloss_editor.setStyleSheet(
+            "font-family: 'Consolas', 'Courier New', monospace; font-size: 12px;"
         )
-        rag_desc.setWordWrap(True)
-        rag_desc.setStyleSheet("color: #8892a4; font-size: 11px;")
-        rl.addWidget(rag_desc)
+        gl.addWidget(self._gloss_editor)
 
-        thresh_row = QHBoxLayout()
-        thresh_row.addWidget(QLabel("RAG threshold:"))
+        # Save / Revert / count
+        ge_row = QHBoxLayout()
+        self._btn_gloss_save = QPushButton("Save")
+        self._btn_gloss_save.setProperty("accent", True)
+        self._btn_gloss_save.setFixedWidth(80)
+        self._btn_gloss_save.setEnabled(False)
+        self._btn_gloss_save.clicked.connect(self._on_gloss_save)
+        ge_row.addWidget(self._btn_gloss_save)
+
+        self._btn_gloss_revert = QPushButton("Revert")
+        self._btn_gloss_revert.setFixedWidth(80)
+        self._btn_gloss_revert.setEnabled(False)
+        self._btn_gloss_revert.clicked.connect(self._on_gloss_revert)
+        ge_row.addWidget(self._btn_gloss_revert)
+
+        ge_row.addStretch()
+
+        self._gloss_count = QLabel("")
+        self._gloss_count.setStyleSheet("color: #8892a4; font-size: 11px;")
+        ge_row.addWidget(self._gloss_count)
+        gl.addLayout(ge_row)
+
+        # RAG threshold
+        rag_row = QHBoxLayout()
+        rag_row.addWidget(QLabel("RAG threshold:"))
         self._thresh_edit = QLineEdit()
         self._thresh_edit.setFixedWidth(60)
-        self._thresh_edit.setText(str(self._cfg.get("translation.rag_threshold", 100)))
-        self._thresh_edit.editingFinished.connect(self._on_threshold_changed)
-        thresh_row.addWidget(self._thresh_edit)
-        thresh_row.addWidget(QLabel("terms"))
-        thresh_row.addStretch()
-        rl.addLayout(thresh_row)
-
-        root.addWidget(rag_box)
-
-        # ── STT Recognition Context ──────────────────────────────────
-        ctx_box = QGroupBox("STT Recognition Context (Term Files)")
-        cl = QVBoxLayout(ctx_box)
-        cl.setSpacing(4)
-
-        ctx_info = QLabel(
-            "Term files improve STT recognition accuracy. Terms are used for:\n"
-            "• Phonetic correction (fuzzy pinyin matching against STT output)\n"
-            "• Whisper initial_prompt context (biases Whisper toward these terms)\n"
-            "Format: one term per line, plain text, UTF-8."
+        self._thresh_edit.setText(
+            str(self._cfg.get("translation.rag_threshold", 100))
         )
-        ctx_info.setWordWrap(True)
-        ctx_info.setStyleSheet("color: #8892a4; font-size: 11px;")
-        cl.addWidget(ctx_info)
+        self._thresh_edit.editingFinished.connect(self._on_threshold_changed)
+        rag_row.addWidget(self._thresh_edit)
+        rag_row.addWidget(QLabel(
+            "terms  (auto-switches from pinyin scan to vector search)"
+        ))
+        rag_row.addStretch()
+        gl.addLayout(rag_row)
 
-        self._term_list = TermFileList(title="Loaded Term Files")
-        self._term_list.files_changed.connect(self._on_term_files_changed)
-        cl.addWidget(self._term_list)
+        root.addWidget(gloss_box)
 
-        # Pre-load existing term files
-        for default_file in ("config/context_gaming.txt",):
-            fp = _PROJECT_ROOT / default_file
-            if fp.exists():
-                self._term_list.add_file(str(fp))
+        # ══════════════════════════════════════════════════════════════
+        # SECTION B: STT Recognition Terms  (stt_terms/*.txt)
+        # ══════════════════════════════════════════════════════════════
+        stt_box = QGroupBox(
+            "STT Recognition Terms  —  stt_terms/*.txt"
+        )
+        sl = QVBoxLayout(stt_box)
 
-        # Capacity + status row
+        stt_info = QLabel(
+            "Format: <b>one term per line</b> (plain text, no translations). "
+            "Fed into Whisper's initial_prompt to bias recognition toward "
+            "these words during speech-to-text."
+        )
+        stt_info.setWordWrap(True)
+        stt_info.setStyleSheet("color: #8892a4; font-size: 11px;")
+        sl.addWidget(stt_info)
+
+        # File table
+        self._stt_table = QTableWidget(0, 2)
+        self._stt_table.setHorizontalHeaderLabels(["File", "Terms"])
+        self._stt_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.Stretch
+        )
+        self._stt_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents
+        )
+        self._stt_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._stt_table.setSelectionMode(QTableWidget.SingleSelection)
+        self._stt_table.setMaximumHeight(100)
+        self._stt_table.verticalHeader().setVisible(False)
+        self._stt_table.currentCellChanged.connect(self._on_stt_file_selected)
+        sl.addWidget(self._stt_table)
+
+        # Buttons
+        sbtn = QHBoxLayout()
+        self._btn_stt_new = QPushButton("New")
+        self._btn_stt_new.setFixedWidth(60)
+        self._btn_stt_new.clicked.connect(self._on_stt_new)
+        sbtn.addWidget(self._btn_stt_new)
+
+        self._btn_stt_import = QPushButton("Import")
+        self._btn_stt_import.setFixedWidth(70)
+        self._btn_stt_import.clicked.connect(self._on_stt_import)
+        sbtn.addWidget(self._btn_stt_import)
+
+        self._btn_stt_delete = QPushButton("Delete")
+        self._btn_stt_delete.setFixedWidth(60)
+        self._btn_stt_delete.setEnabled(False)
+        self._btn_stt_delete.clicked.connect(self._on_stt_delete)
+        sbtn.addWidget(self._btn_stt_delete)
+
+        sbtn.addStretch()
+
+        self._stt_total_label = QLabel("")
+        self._stt_total_label.setStyleSheet("color: #8892a4; font-size: 11px;")
+        sbtn.addWidget(self._stt_total_label)
+        sl.addLayout(sbtn)
+
+        # Editor
+        self._stt_editor = QTextEdit()
+        self._stt_editor.setPlaceholderText(
+            "# One term per line\n"
+            "# These words bias Whisper recognition\n"
+            "科技小院\n"
+            "中国农业大学\n"
+            "曲周"
+        )
+        self._stt_editor.setMinimumHeight(120)
+        self._stt_editor.setStyleSheet(
+            "font-family: 'Consolas', 'Courier New', monospace; font-size: 12px;"
+        )
+        sl.addWidget(self._stt_editor)
+
+        # Save / Revert / count
+        se_row = QHBoxLayout()
+        self._btn_stt_save = QPushButton("Save")
+        self._btn_stt_save.setProperty("accent", True)
+        self._btn_stt_save.setFixedWidth(80)
+        self._btn_stt_save.setEnabled(False)
+        self._btn_stt_save.clicked.connect(self._on_stt_save)
+        se_row.addWidget(self._btn_stt_save)
+
+        self._btn_stt_revert = QPushButton("Revert")
+        self._btn_stt_revert.setFixedWidth(80)
+        self._btn_stt_revert.setEnabled(False)
+        self._btn_stt_revert.clicked.connect(self._on_stt_revert)
+        se_row.addWidget(self._btn_stt_revert)
+
+        se_row.addStretch()
+
+        self._stt_count = QLabel("")
+        self._stt_count.setStyleSheet("color: #8892a4; font-size: 11px;")
+        se_row.addWidget(self._stt_count)
+        sl.addLayout(se_row)
+
+        # Capacity slider
         cap_row = QHBoxLayout()
         self._capacity_slider = ParamSlider(
             "Initial Prompt Capacity",
@@ -243,94 +309,82 @@ class KnowledgeBaseTab(QWidget):
             lambda v: self._cfg.set("stt.initial_prompt_capacity", int(v))
         )
         cap_row.addWidget(self._capacity_slider)
+        sl.addLayout(cap_row)
 
-        self._term_status = QLabel("Loaded: 0 terms")
-        self._term_status.setMinimumWidth(120)
-        self._term_status.setStyleSheet("color: #8892a4; font-size: 11px;")
-        cap_row.addWidget(self._term_status)
-        cl.addLayout(cap_row)
-
-        root.addWidget(ctx_box)
+        root.addWidget(stt_box)
 
         root.addStretch()
 
         # Initial scan
-        self._scan_files()
+        self._scan_gloss_files()
+        self._scan_stt_files()
 
-    # ------------------------------------------------------------------
-    # File management
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # GLOSSARY file management
+    # ==================================================================
 
-    def _scan_files(self) -> None:
-        """Scan knowledge_base/ and populate the file table."""
-        self._file_table.setRowCount(0)
+    def _scan_gloss_files(self) -> None:
+        """Scan knowledge_base/ and populate the glossary file table."""
+        self._gloss_table.setRowCount(0)
         _KB_DIR.mkdir(parents=True, exist_ok=True)
 
         total_terms = 0
         for f in sorted(_KB_DIR.glob("*.txt")):
-            row = self._file_table.rowCount()
-            self._file_table.insertRow(row)
+            row = self._gloss_table.rowCount()
+            self._gloss_table.insertRow(row)
+            self._gloss_table.setItem(row, 0, QTableWidgetItem(f.name))
 
-            self._file_table.setItem(row, 0, QTableWidgetItem(f.name))
+            tc = self._count_terms(f)
+            total_terms += tc
+            ci = QTableWidgetItem(str(tc))
+            ci.setTextAlignment(Qt.AlignCenter)
+            self._gloss_table.setItem(row, 1, ci)
 
-            term_count = self._count_terms(f)
-            total_terms += term_count
-            count_item = QTableWidgetItem(str(term_count))
-            count_item.setTextAlignment(Qt.AlignCenter)
-            self._file_table.setItem(row, 1, count_item)
-
-            status_item = QTableWidgetItem("Loaded")
-            status_item.setTextAlignment(Qt.AlignCenter)
-            self._file_table.setItem(row, 2, status_item)
+            si = QTableWidgetItem("Loaded")
+            si.setTextAlignment(Qt.AlignCenter)
+            self._gloss_table.setItem(row, 2, si)
 
         # Update RAG status
         threshold = self._cfg.get("translation.rag_threshold", 100)
         if total_terms >= threshold:
-            self._rag_label.setText(f"RAG: active ({total_terms} terms ≥ {threshold} threshold)")
+            self._rag_label.setText(
+                f"RAG: active ({total_terms} ≥ {threshold})"
+            )
             self._rag_label.setStyleSheet("color: #0f9b8e; font-size: 11px;")
         else:
-            self._rag_label.setText(f"RAG: inactive ({total_terms} terms < {threshold} threshold)")
+            self._rag_label.setText(
+                f"RAG: inactive ({total_terms} < {threshold})"
+            )
             self._rag_label.setStyleSheet("color: #8892a4; font-size: 11px;")
 
-    @staticmethod
-    def _count_terms(path: Path) -> int:
-        """Count non-comment, non-empty lines in a glossary file."""
-        count = 0
-        try:
-            for line in path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    count += 1
-        except Exception:
-            pass
-        return count
-
     @Slot(int, int, int, int)
-    def _on_file_selected(self, row: int, _col: int, _prev_row: int, _prev_col: int) -> None:
+    def _on_gloss_file_selected(
+        self, row: int, _c: int, _pr: int, _pc: int
+    ) -> None:
         if row < 0:
-            self._current_file = None
-            self._editor.clear()
-            self._btn_save.setEnabled(False)
-            self._btn_revert.setEnabled(False)
-            self._btn_delete.setEnabled(False)
+            self._gloss_current = None
+            self._gloss_editor.clear()
+            self._btn_gloss_save.setEnabled(False)
+            self._btn_gloss_revert.setEnabled(False)
+            self._btn_gloss_delete.setEnabled(False)
             return
 
-        name = self._file_table.item(row, 0).text()
+        name = self._gloss_table.item(row, 0).text()
         path = _KB_DIR / name
-        self._current_file = path
-        self._btn_delete.setEnabled(True)
+        self._gloss_current = path
+        self._btn_gloss_delete.setEnabled(True)
 
         if path.exists():
-            self._editor.setPlainText(path.read_text(encoding="utf-8"))
-            self._btn_save.setEnabled(True)
-            self._btn_revert.setEnabled(True)
-            self._update_term_count()
+            self._gloss_editor.setPlainText(
+                path.read_text(encoding="utf-8")
+            )
+            self._btn_gloss_save.setEnabled(True)
+            self._btn_gloss_revert.setEnabled(True)
+            self._update_gloss_count()
 
     @Slot()
-    def _on_new_glossary(self) -> None:
-        """Create a new empty glossary file."""
+    def _on_gloss_new(self) -> None:
         _KB_DIR.mkdir(parents=True, exist_ok=True)
-        # Find next available name
         i = 1
         while (_KB_DIR / f"glossary_{i:02d}.txt").exists():
             i += 1
@@ -341,17 +395,15 @@ class KnowledgeBaseTab(QWidget):
             "#\n",
             encoding="utf-8",
         )
-        self._scan_files()
-        # Select the new file
-        for row in range(self._file_table.rowCount()):
-            if self._file_table.item(row, 0).text() == path.name:
-                self._file_table.selectRow(row)
+        self._scan_gloss_files()
+        for row in range(self._gloss_table.rowCount()):
+            if self._gloss_table.item(row, 0).text() == path.name:
+                self._gloss_table.selectRow(row)
                 break
         self.glossary_changed.emit()
 
     @Slot()
-    def _on_import_file(self) -> None:
-        """Import an external glossary text file."""
+    def _on_gloss_import(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Import Glossary File", "",
             "Text Files (*.txt);;All Files (*)",
@@ -369,115 +421,218 @@ class KnowledgeBaseTab(QWidget):
             if ret != QMessageBox.Yes:
                 return
         dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-        self._scan_files()
+        self._scan_gloss_files()
         self.glossary_changed.emit()
 
     @Slot()
-    def _on_delete_file(self) -> None:
-        """Delete the selected glossary file."""
-        if not self._current_file or not self._current_file.exists():
+    def _on_gloss_delete(self) -> None:
+        if not self._gloss_current or not self._gloss_current.exists():
             return
         ret = QMessageBox.question(
             self, "Delete Glossary",
-            f"Delete {self._current_file.name}?",
+            f"Delete {self._gloss_current.name}?",
             QMessageBox.Yes | QMessageBox.No,
         )
         if ret != QMessageBox.Yes:
             return
-        self._current_file.unlink()
-        self._current_file = None
-        self._editor.clear()
-        self._scan_files()
+        self._gloss_current.unlink()
+        self._gloss_current = None
+        self._gloss_editor.clear()
+        self._scan_gloss_files()
         self.glossary_changed.emit()
 
     @Slot()
-    def _on_save(self) -> None:
-        """Save the editor content to the current file."""
-        if not self._current_file:
+    def _on_gloss_save(self) -> None:
+        if not self._gloss_current:
             return
-        self._current_file.write_text(
-            self._editor.toPlainText(), encoding="utf-8",
+        self._gloss_current.write_text(
+            self._gloss_editor.toPlainText(), encoding="utf-8"
         )
-        self._scan_files()
-        self._update_term_count()
+        self._scan_gloss_files()
+        self._update_gloss_count()
         self.glossary_changed.emit()
-        logger.info("Glossary saved: %s", self._current_file.name)
+        logger.info("Glossary saved: %s", self._gloss_current.name)
 
     @Slot()
-    def _on_revert(self) -> None:
-        """Reload file content, discarding editor changes."""
-        if self._current_file and self._current_file.exists():
-            self._editor.setPlainText(
-                self._current_file.read_text(encoding="utf-8"),
+    def _on_gloss_revert(self) -> None:
+        if self._gloss_current and self._gloss_current.exists():
+            self._gloss_editor.setPlainText(
+                self._gloss_current.read_text(encoding="utf-8")
             )
-            self._update_term_count()
+            self._update_gloss_count()
 
-    @Slot()
-    def _on_quick_add(self) -> None:
-        """Add a term to the currently selected glossary file."""
-        term = self._quick_term.text().strip()
-        if not term:
-            return
-        trans = self._quick_trans.text().strip()
-        line = f"{term}|{trans}" if trans else term
-
-        if self._current_file and self._current_file.exists():
-            # Append to file and update editor
-            content = self._current_file.read_text(encoding="utf-8")
-            if not content.endswith("\n"):
-                content += "\n"
-            content += line + "\n"
-            self._current_file.write_text(content, encoding="utf-8")
-            self._editor.setPlainText(content)
-        else:
-            # Append to editor only
-            cursor = self._editor.textCursor()
-            cursor.movePosition(cursor.End)
-            text = self._editor.toPlainText()
-            if text and not text.endswith("\n"):
-                cursor.insertText("\n")
-            cursor.insertText(line + "\n")
-
-        self._quick_term.clear()
-        self._quick_trans.clear()
-        self._scan_files()
-        self._update_term_count()
-        self.glossary_changed.emit()
+    def _update_gloss_count(self) -> None:
+        text = self._gloss_editor.toPlainText()
+        count = sum(
+            1 for line in text.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+        self._gloss_count.setText(f"{count} terms")
 
     @Slot()
     def _on_threshold_changed(self) -> None:
-        """Update RAG threshold from UI."""
         try:
             val = int(self._thresh_edit.text())
             if val < 1:
                 val = 1
             self._cfg.set("translation.rag_threshold", val)
-            self._scan_files()  # Refresh RAG status display
+            self._scan_gloss_files()
         except ValueError:
             pass
 
-    def _update_term_count(self) -> None:
-        """Update the term count label from editor content."""
-        text = self._editor.toPlainText()
+    # ==================================================================
+    # STT TERM file management
+    # ==================================================================
+
+    def _scan_stt_files(self) -> None:
+        """Scan stt_terms/ and populate the STT term file table."""
+        self._stt_table.setRowCount(0)
+        _STT_TERMS_DIR.mkdir(parents=True, exist_ok=True)
+
+        total = 0
+        for f in sorted(_STT_TERMS_DIR.glob("*.txt")):
+            row = self._stt_table.rowCount()
+            self._stt_table.insertRow(row)
+            self._stt_table.setItem(row, 0, QTableWidgetItem(f.name))
+
+            tc = self._count_terms(f)
+            total += tc
+            ci = QTableWidgetItem(str(tc))
+            ci.setTextAlignment(Qt.AlignCenter)
+            self._stt_table.setItem(row, 1, ci)
+
+        self._stt_total_label.setText(f"Total: {total} terms")
+        self._emit_stt_files()
+
+    @Slot(int, int, int, int)
+    def _on_stt_file_selected(
+        self, row: int, _c: int, _pr: int, _pc: int
+    ) -> None:
+        if row < 0:
+            self._stt_current = None
+            self._stt_editor.clear()
+            self._btn_stt_save.setEnabled(False)
+            self._btn_stt_revert.setEnabled(False)
+            self._btn_stt_delete.setEnabled(False)
+            return
+
+        name = self._stt_table.item(row, 0).text()
+        path = _STT_TERMS_DIR / name
+        self._stt_current = path
+        self._btn_stt_delete.setEnabled(True)
+
+        if path.exists():
+            self._stt_editor.setPlainText(
+                path.read_text(encoding="utf-8")
+            )
+            self._btn_stt_save.setEnabled(True)
+            self._btn_stt_revert.setEnabled(True)
+            self._update_stt_count()
+
+    @Slot()
+    def _on_stt_new(self) -> None:
+        _STT_TERMS_DIR.mkdir(parents=True, exist_ok=True)
+        i = 1
+        while (_STT_TERMS_DIR / f"terms_{i:02d}.txt").exists():
+            i += 1
+        path = _STT_TERMS_DIR / f"terms_{i:02d}.txt"
+        path.write_text(
+            "# STT Recognition Terms\n"
+            "# One term per line — biases Whisper toward these words\n"
+            "#\n",
+            encoding="utf-8",
+        )
+        self._scan_stt_files()
+        for row in range(self._stt_table.rowCount()):
+            if self._stt_table.item(row, 0).text() == path.name:
+                self._stt_table.selectRow(row)
+                break
+
+    @Slot()
+    def _on_stt_import(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Term File", "",
+            "Text Files (*.txt);;All Files (*)",
+        )
+        if not path:
+            return
+        src = Path(path)
+        dest = _STT_TERMS_DIR / src.name
+        if dest.exists():
+            ret = QMessageBox.question(
+                self, "File Exists",
+                f"{dest.name} already exists. Overwrite?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if ret != QMessageBox.Yes:
+                return
+        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        self._scan_stt_files()
+
+    @Slot()
+    def _on_stt_delete(self) -> None:
+        if not self._stt_current or not self._stt_current.exists():
+            return
+        ret = QMessageBox.question(
+            self, "Delete Term File",
+            f"Delete {self._stt_current.name}?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if ret != QMessageBox.Yes:
+            return
+        self._stt_current.unlink()
+        self._stt_current = None
+        self._stt_editor.clear()
+        self._scan_stt_files()
+
+    @Slot()
+    def _on_stt_save(self) -> None:
+        if not self._stt_current:
+            return
+        self._stt_current.write_text(
+            self._stt_editor.toPlainText(), encoding="utf-8"
+        )
+        self._scan_stt_files()
+        self._update_stt_count()
+        logger.info("STT terms saved: %s", self._stt_current.name)
+
+    @Slot()
+    def _on_stt_revert(self) -> None:
+        if self._stt_current and self._stt_current.exists():
+            self._stt_editor.setPlainText(
+                self._stt_current.read_text(encoding="utf-8")
+            )
+            self._update_stt_count()
+
+    def _update_stt_count(self) -> None:
+        text = self._stt_editor.toPlainText()
         count = sum(
             1 for line in text.splitlines()
             if line.strip() and not line.strip().startswith("#")
         )
-        self._term_count_label.setText(f"{count} terms")
+        self._stt_count.setText(f"{count} terms")
 
-    @Slot(list)
-    def _on_term_files_changed(self, paths: list[str]) -> None:
-        """Handle STT term file list changes."""
-        total_terms = 0
-        for p in paths:
-            try:
-                pp = Path(p)
-                if pp.exists():
-                    total_terms += sum(
-                        1 for line in pp.read_text(encoding="utf-8").splitlines()
-                        if line.strip()
-                    )
-            except Exception:
-                pass
-        self._term_status.setText(f"Loaded: {total_terms} terms")
+    def _emit_stt_files(self) -> None:
+        """Emit all STT term file paths."""
+        paths = [
+            str(f) for f in sorted(_STT_TERMS_DIR.glob("*.txt"))
+            if f.is_file()
+        ]
         self.term_files_changed.emit(paths)
+
+    # ==================================================================
+    # Shared
+    # ==================================================================
+
+    @staticmethod
+    def _count_terms(path: Path) -> int:
+        """Count non-comment, non-empty lines."""
+        count = 0
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    count += 1
+        except Exception:
+            pass
+        return count
