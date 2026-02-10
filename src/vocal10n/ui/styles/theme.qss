@@ -102,8 +102,8 @@ QPushButton {
     color: #e0e0e0;
     border: 1px solid #2d3f5f;
     border-radius: 4px;
-    padding: 6px 16px;
-    min-height: 24px;
+    padding: 4px 12px;
+    margin: 0px;
 }
 
 QPushButton:hover {
@@ -164,17 +164,12 @@ QComboBox:hover {
 
 QComboBox::drop-down {
     border: none;
-    width: 28px;
+    width: 24px;
     background-color: transparent;
 }
 
 QComboBox::down-arrow {
     image: none;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 7px solid #0f9b8e;
-    margin-right: 8px;
-    width: 0px;
 }
 
 QComboBox QAbstractItemView {

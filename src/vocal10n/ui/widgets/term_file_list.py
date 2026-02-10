@@ -64,10 +64,13 @@ class _FileItemWidget(QWidget):
         lay.addStretch()
 
         # Delete button
-        del_btn = QPushButton("Remove")
-        del_btn.setMinimumWidth(60)
-        del_btn.setFixedHeight(22)
-        del_btn.setStyleSheet("font-size: 10px;")
+        del_btn = QPushButton("x")
+        del_btn.setMinimumWidth(36)
+        del_btn.setFixedHeight(24)
+        del_btn.setStyleSheet(
+            "font-size: 13px; font-weight: bold; "
+            "padding: 2px; border-radius: 3px;color: #e94560;"
+        )
         del_btn.setToolTip("Remove this file")
         del_btn.clicked.connect(lambda: self.remove_requested.emit(self._path))
         lay.addWidget(del_btn)
