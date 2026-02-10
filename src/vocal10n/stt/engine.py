@@ -107,7 +107,7 @@ class STTEngine:
             best_of=1,
             temperature=0,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=300, speech_pad_ms=200),
+            vad_parameters=dict(min_silence_duration_ms=300, speech_pad_ms=400),
             word_timestamps=True,
             condition_on_previous_text=False,
             repetition_penalty=1.1,

@@ -21,13 +21,20 @@ def list_output_devices() -> list[dict[str, Any]]:
     """Return list of available audio output devices.
 
     Each dict contains: index, name, channels, sample_rate.
+    Deduplicates by keeping only the first device per unique name
+    (typically the Windows DirectSound / WASAPI default).
     """
+    seen_names: set[str] = set()
     devices = []
     for idx, dev in enumerate(sd.query_devices()):
         if dev["max_output_channels"] > 0:
+            name = dev["name"]
+            if name in seen_names:
+                continue
+            seen_names.add(name)
             devices.append({
                 "index": idx,
-                "name": dev["name"],
+                "name": name,
                 "channels": dev["max_output_channels"],
                 "sample_rate": int(dev["default_samplerate"]),
             })
@@ -93,7 +100,11 @@ class AudioPlayer:
             logger.error("Audio playback failed: %s", e)
             return False
 
-    def play_stream(self, chunk_generator: Generator[bytes, None, None]) -> bool:
+    def play_stream(
+        self,
+        chunk_generator: Generator[bytes, None, None],
+        request_start: Optional[float] = None,
+    ) -> dict:
         """Play streaming audio chunks as they arrive.
 
         The first chunk must contain a WAV header (44 bytes) followed by PCM data.
@@ -101,15 +112,18 @@ class AudioPlayer:
 
         Args:
             chunk_generator: Yields raw audio bytes (first chunk has WAV header).
+            request_start: Epoch time when the TTS request was initiated.
 
         Returns:
-            True if playback completed successfully.
+            Dict with 'success' (bool) and 'ttfa_ms' (time-to-first-audio in ms).
         """
         sample_rate = 32000
         channels = 1
         sample_width = 2  # int16
         header_parsed = False
         stream = None
+        ttfa_ms: Optional[float] = None
+        import time as _time
 
         try:
             for chunk in chunk_generator:
@@ -136,14 +150,22 @@ class AudioPlayer:
 
                 # Create output stream on first PCM data
                 if stream is None:
+                    # Use a large blocksize to buffer ~0.25s of audio,
+                    # preventing underrun stutters when HTTP chunks arrive slowly
+                    blocksize = int(sample_rate * 0.25)
                     stream = sd.OutputStream(
                         samplerate=sample_rate,
                         channels=channels,
                         dtype="int16" if sample_width == 2 else "int32",
                         device=self.device_index,
+                        blocksize=blocksize,
                     )
                     stream.start()
-                    logger.info("Streaming audio playback started (sr=%d)", sample_rate)
+                    if request_start is not None:
+                        ttfa_ms = (_time.time() - request_start) * 1000
+                        logger.info("Streaming audio playback started (sr=%d, TTFA=%.0fms)", sample_rate, ttfa_ms)
+                    else:
+                        logger.info("Streaming audio playback started (sr=%d)", sample_rate)
 
                 # Convert bytes to numpy and write
                 dtype = np.int16 if sample_width == 2 else np.int32
@@ -157,7 +179,7 @@ class AudioPlayer:
             if stream:
                 stream.stop()
                 stream.close()
-            return True
+            return {"success": True, "ttfa_ms": ttfa_ms}
 
         except Exception as e:
             logger.error("Streaming playback error: %s", e)
@@ -167,7 +189,7 @@ class AudioPlayer:
                     stream.close()
                 except Exception:
                     pass
-            return False
+            return {"success": False, "ttfa_ms": ttfa_ms}
 
     def stop(self) -> None:
         """Stop any ongoing playback."""

@@ -87,7 +87,7 @@ class STTWorker(QThread):
 
                 audio = self._capture.get_from_offset(last_confirmed_end)
                 last_transcribe_t = cur_dur
-                if len(audio) < self._capture.sample_rate * 0.5:
+                if len(audio) < self._capture.sample_rate * 0.3:
                     self.msleep(100)
                     continue
 

@@ -238,6 +238,7 @@ class GPTSoVITSClient:
             "status": "success",
             "audio_generator": audio_generator(),
             "latency_ms": latency_ms,
+            "request_start": time.time() - latency_ms / 1000,
             "streaming": True,
         }
 

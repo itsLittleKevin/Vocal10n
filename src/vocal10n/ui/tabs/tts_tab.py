@@ -91,6 +91,20 @@ class TTSTab(QWidget):
         # Listen for state changes
         self._state.tts_status_changed.connect(self._on_status_changed)
 
+        # ── Output Device ─────────────────────────────────────────────
+        dev_box = QGroupBox("Audio Output")
+        dev_lay = QHBoxLayout(dev_box)
+        dev_lay.addWidget(QLabel("Device:"))
+        self._device_combo = ArrowComboBox()
+        self._populate_devices()
+        self._device_combo.currentIndexChanged.connect(self._on_device_changed)
+        dev_lay.addWidget(self._device_combo, stretch=1)
+        refresh_btn = QPushButton("\u27f3")
+        refresh_btn.setFixedSize(36, 36)
+        refresh_btn.clicked.connect(self._populate_devices)
+        dev_lay.addWidget(refresh_btn)
+        root.addWidget(dev_box)
+
         # ── Reference Audio ───────────────────────────────────────────
         ref_box = QGroupBox("Reference Audio (Voice Clone)")
         ref_lay = QVBoxLayout(ref_box)
@@ -137,20 +151,6 @@ class TTSTab(QWidget):
         ref_lay.addLayout(lang_row)
 
         root.addWidget(ref_box)
-
-        # ── Output Device ─────────────────────────────────────────────
-        dev_box = QGroupBox("Audio Output")
-        dev_lay = QHBoxLayout(dev_box)
-        dev_lay.addWidget(QLabel("Device:"))
-        self._device_combo = ArrowComboBox()
-        self._populate_devices()
-        self._device_combo.currentIndexChanged.connect(self._on_device_changed)
-        dev_lay.addWidget(self._device_combo, stretch=1)
-        refresh_btn = QPushButton("⟳")
-        refresh_btn.setFixedSize(36, 36)
-        refresh_btn.clicked.connect(self._populate_devices)
-        dev_lay.addWidget(refresh_btn)
-        root.addWidget(dev_box)
 
         # ── TTS Parameters ────────────────────────────────────────────
         param_box = QGroupBox("Synthesis Parameters")

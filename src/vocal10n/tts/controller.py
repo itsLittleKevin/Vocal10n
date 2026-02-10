@@ -44,6 +44,7 @@ class TTSController(QObject):
         self._client: Optional[GPTSoVITSClient] = None
         self._queue: Optional[TTSQueue] = None
         self._player: Optional[AudioPlayer] = None
+        self._pending_device: Optional[int] = None  # stored until player is created
 
     # ------------------------------------------------------------------
     # Server lifecycle
@@ -71,8 +72,8 @@ class TTSController(QObject):
             self._client = GPTSoVITSClient(self._build_config())
             self._client.check_health()
 
-            # Initialize player
-            self._player = AudioPlayer()
+            # Initialize player with any device the user already selected
+            self._player = AudioPlayer(device_index=self._pending_device)
 
             # Initialize queue
             self._queue = TTSQueue(self._client, max_size=10)
@@ -229,32 +230,30 @@ class TTSController(QObject):
     def set_output_device(self, device_index: int) -> None:
         """Change the audio output device."""
         idx = device_index if device_index >= 0 else None
+        self._pending_device = idx
         if self._player:
             self._player.set_device(idx)
-            logger.info("Audio output device changed to: %s", idx)
+        logger.info("Audio output device changed to: %s", idx)
 
     def _on_audio_ready(self, result: dict) -> None:
         """Called by queue worker when audio is ready (streaming or full)."""
-        # Record TTS latency (time-to-first-byte for streaming, total for full)
-        latency_ms = result.get("latency_ms", 0)
-        if self._latency and latency_ms > 0:
-            self._latency.record_tts(latency_ms)
-            stt_stats = self._latency.get_stats("stt")
-            trans_stats = self._latency.get_stats("translation")
-            if stt_stats.count > 0 and trans_stats.count > 0:
-                total = stt_stats.current_ms + trans_stats.current_ms + latency_ms
-                self._latency.record_total(total)
-
         if result.get("streaming") and self._player:
             generator = result.get("audio_generator")
             if generator:
                 logger.info("Starting streaming TTS playback")
-                success = self._player.play_stream(generator)
-                if not success:
+                request_start = result.get("request_start")
+                play_result = self._player.play_stream(generator, request_start=request_start)
+                ttfa_ms = play_result.get("ttfa_ms")
+                if ttfa_ms is not None:
+                    self._record_tts_latency(ttfa_ms)
+                if not play_result.get("success"):
                     logger.error("Streaming audio playback failed")
             else:
                 logger.warning("Streaming result but no audio_generator")
         else:
+            latency_ms = result.get("latency_ms", 0)
+            if latency_ms > 0:
+                self._record_tts_latency(latency_ms)
             audio_data = result.get("audio_data")
             if audio_data and self._player:
                 logger.info("Playing TTS audio: %d bytes, duration=%.1fms",
@@ -264,6 +263,17 @@ class TTSController(QObject):
                     logger.error("Audio playback failed")
             else:
                 logger.warning("Audio callback: no audio_data or no player")
+
+    def _record_tts_latency(self, latency_ms: float) -> None:
+        """Record TTS latency and compute total pipeline latency."""
+        if not self._latency:
+            return
+        self._latency.record_tts(latency_ms)
+        stt_stats = self._latency.get_stats("stt")
+        trans_stats = self._latency.get_stats("translation")
+        if stt_stats.count > 0 and trans_stats.count > 0:
+            total = stt_stats.current_ms + trans_stats.current_ms + latency_ms
+            self._latency.record_total(total)
 
     # ------------------------------------------------------------------
     # Cleanup

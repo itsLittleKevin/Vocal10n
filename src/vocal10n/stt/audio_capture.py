@@ -45,7 +45,8 @@ class AudioCapture:
     def start(self) -> None:
         if self._running:
             return
-        self._buffer = np.array([], dtype=np.float32)
+        # Pre-fill with 0.5s silence so VAD has room to detect speech onset
+        self._buffer = np.zeros(int(self._sample_rate * 0.5), dtype=np.float32)
         self._running = True
 
         self._stream = sd.InputStream(
