@@ -134,7 +134,7 @@ class KnowledgeBaseTab(QWidget):
         gbtn.addWidget(self._btn_gloss_import)
 
         self._btn_gloss_delete = QPushButton("Delete")
-        self._btn_gloss_delete.setFixedWidth(60)
+        self._btn_gloss_delete.setFixedWidth(80)
         self._btn_gloss_delete.setEnabled(False)
         self._btn_gloss_delete.clicked.connect(self._on_gloss_delete)
         gbtn.addWidget(self._btn_gloss_delete)
@@ -246,7 +246,7 @@ class KnowledgeBaseTab(QWidget):
         sbtn.addWidget(self._btn_stt_import)
 
         self._btn_stt_delete = QPushButton("Delete")
-        self._btn_stt_delete.setFixedWidth(60)
+        self._btn_stt_delete.setFixedWidth(80)
         self._btn_stt_delete.setEnabled(False)
         self._btn_stt_delete.clicked.connect(self._on_stt_delete)
         sbtn.addWidget(self._btn_stt_delete)
