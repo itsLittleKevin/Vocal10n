@@ -7,7 +7,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 try:
-    import pynvml
+    import pynvml  # provided by nvidia-ml-py
 
     _NVML_AVAILABLE = True
 except ImportError:

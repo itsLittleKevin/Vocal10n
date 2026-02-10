@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
-_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / ".." / "config" / "default.yaml"
+_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "default.yaml"
 
 
 class Config:

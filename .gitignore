@@ -44,6 +44,10 @@ output/**
 # === Legacy prebuild ===
 Vocal10n-prebuild/
 
+# === Local planning docs (not for repo) ===
+initialplan.md
+promptfile.md
+
 # === Build / Distribution ===
 build/
 dist/
