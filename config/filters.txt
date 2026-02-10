@@ -1,0 +1,40 @@
+# Hallucination Filters - Add phrases or regex patterns to block
+# - Lines starting with PHRASE: are treated as simple text matches
+# - Lines starting with REGEX: are treated as Python regular expressions
+# - Plain lines (no prefix) are treated as simple text matches
+
+# --- Specific Hallucination Phrases ---
+谢谢
+谢谢大家
+字幕由
+以下是普通话的转录
+好久不见
+好久不见了
+大家好
+你好
+再见
+我看你了
+
+# --- Regex Patterns for Trailing Words (hallucinations at end of sentence) ---
+# Matches "好" after a comma or space at the very end of a segment
+REGEX:.*[，, ]好[。！？.! ]?$
+# Matches "对吧" or "知道吧" if they are the ONLY things in a segment
+REGEX:^[好对说呢吧啊嗯]?[。，！？.!?, ]?$
+# Matches repetitive single characters often produced in silence
+REGEX:^(.+)\1{3,}$
+# Matches the specific "*,好" pattern you mentioned
+REGEX:.*，好$
+# Matches trailing "啊" or "嗯"
+REGEX:.*[，, ][啊嗯]$
+
+# --- Language switch hallucinations (Whisper detects wrong language) ---
+voilà
+What's up
+Come on
+
+# --- Contextual hallucinations ---
+我可以做到
+我爱你
+你明白吗
+你真的吗
+拜拜
