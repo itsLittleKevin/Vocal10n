@@ -27,6 +27,7 @@ class TTSQueue:
         self._stop_event = threading.Event()
         self._processing = False
         self._audio_callback: Optional[Callable[[dict[str, Any]], None]] = None
+        self._stream_callback: Optional[Callable] = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -132,21 +133,26 @@ class TTSQueue:
             self._processing = True
             t0 = time.time()
             try:
-                result = self.client.synthesize(request["text"], request["language"], streaming=False)
+                result = self.client.synthesize(request["text"], request["language"], streaming=True)
             except Exception as e:
                 logger.exception("TTS synthesize exception: %s", e)
                 self._processing = False
                 continue
             dt = time.time() - t0
-            self._processing = False
 
             status = result.get("status", "unknown")
             if status == "success" and self._audio_callback:
-                audio_size = len(result.get("audio_data", b""))
-                logger.info("TTS synthesis completed in %.1fs, duration=%.1fms, audio=%d bytes", 
-                            dt, result.get("duration_ms", 0), audio_size)
-                self._audio_callback(result)
+                if result.get("streaming"):
+                    logger.info("TTS streaming started in %.1fms (time-to-first-byte)", result.get("latency_ms", 0))
+                    # Callback will call play_stream() which blocks during playback
+                    self._audio_callback(result)
+                else:
+                    audio_size = len(result.get("audio_data", b""))
+                    logger.info("TTS synthesis completed in %.1fs, duration=%.1fms, audio=%d bytes", 
+                                dt, result.get("duration_ms", 0), audio_size)
+                    self._audio_callback(result)
             elif status == "error":
                 logger.error("TTS synthesis failed (%.1fs): %s", dt, result.get("message"))
             else:
                 logger.warning("TTS unexpected result status: %s, keys: %s", status, list(result.keys()))
+            self._processing = False

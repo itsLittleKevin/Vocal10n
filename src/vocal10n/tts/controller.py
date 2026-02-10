@@ -219,10 +219,10 @@ class TTSController(QObject):
             ref_audio_text=ref_text,
             ref_audio_lang=self._cfg.get("tts.ref_audio_lang", "en"),
             output_lang=self._cfg.get("tts.output_lang", "en"),
-            speed_factor=self._cfg.get("tts.speed_factor", 1.0),
-            top_k=self._cfg.get("tts.top_k", 15),
-            top_p=self._cfg.get("tts.top_p", 1.0),
-            temperature=self._cfg.get("tts.temperature", 1.0),
+            speed_factor=self._cfg.get("tts.speed_factor", 1.2),
+            top_k=self._cfg.get("tts.top_k", 5),
+            top_p=self._cfg.get("tts.top_p", 0.7),
+            temperature=self._cfg.get("tts.temperature", 0.5),
         )
 
     @Slot(int)
@@ -234,26 +234,36 @@ class TTSController(QObject):
             logger.info("Audio output device changed to: %s", idx)
 
     def _on_audio_ready(self, result: dict) -> None:
-        """Called by queue worker when audio is ready."""
-        audio_data = result.get("audio_data")
-        if audio_data and self._player:
-            logger.info("Playing TTS audio: %d bytes, duration=%.1fms", 
-                        len(audio_data), result.get("duration_ms", 0))
-            # Record TTS latency
-            latency_ms = result.get("latency_ms", 0)
-            if self._latency and latency_ms > 0:
-                self._latency.record_tts(latency_ms)
-                # Compute total = STT + Translation + TTS
-                stt_stats = self._latency.get_stats("stt")
-                trans_stats = self._latency.get_stats("translation")
-                if stt_stats.count > 0 and trans_stats.count > 0:
-                    total = stt_stats.current_ms + trans_stats.current_ms + latency_ms
-                    self._latency.record_total(total)
-            success = self._player.play(audio_data, blocking=False)
-            if not success:
-                logger.error("Audio playback failed")
+        """Called by queue worker when audio is ready (streaming or full)."""
+        # Record TTS latency (time-to-first-byte for streaming, total for full)
+        latency_ms = result.get("latency_ms", 0)
+        if self._latency and latency_ms > 0:
+            self._latency.record_tts(latency_ms)
+            stt_stats = self._latency.get_stats("stt")
+            trans_stats = self._latency.get_stats("translation")
+            if stt_stats.count > 0 and trans_stats.count > 0:
+                total = stt_stats.current_ms + trans_stats.current_ms + latency_ms
+                self._latency.record_total(total)
+
+        if result.get("streaming") and self._player:
+            generator = result.get("audio_generator")
+            if generator:
+                logger.info("Starting streaming TTS playback")
+                success = self._player.play_stream(generator)
+                if not success:
+                    logger.error("Streaming audio playback failed")
+            else:
+                logger.warning("Streaming result but no audio_generator")
         else:
-            logger.warning("Audio callback: no audio_data or no player")
+            audio_data = result.get("audio_data")
+            if audio_data and self._player:
+                logger.info("Playing TTS audio: %d bytes, duration=%.1fms",
+                            len(audio_data), result.get("duration_ms", 0))
+                success = self._player.play(audio_data, blocking=False)
+                if not success:
+                    logger.error("Audio playback failed")
+            else:
+                logger.warning("Audio callback: no audio_data or no player")
 
     # ------------------------------------------------------------------
     # Cleanup

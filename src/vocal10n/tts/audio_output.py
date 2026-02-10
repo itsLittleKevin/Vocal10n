@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import io
 import logging
+import struct
 import wave
-from typing import Any, Optional
+from typing import Any, Generator, Optional
 
 import numpy as np
 import sounddevice as sd
@@ -90,6 +91,82 @@ class AudioPlayer:
             return True
         except sd.PortAudioError as e:
             logger.error("Audio playback failed: %s", e)
+            return False
+
+    def play_stream(self, chunk_generator: Generator[bytes, None, None]) -> bool:
+        """Play streaming audio chunks as they arrive.
+
+        The first chunk must contain a WAV header (44 bytes) followed by PCM data.
+        Subsequent chunks are raw PCM data.
+
+        Args:
+            chunk_generator: Yields raw audio bytes (first chunk has WAV header).
+
+        Returns:
+            True if playback completed successfully.
+        """
+        sample_rate = 32000
+        channels = 1
+        sample_width = 2  # int16
+        header_parsed = False
+        stream = None
+
+        try:
+            for chunk in chunk_generator:
+                if not chunk:
+                    continue
+
+                if not header_parsed:
+                    # Parse WAV header from first chunk
+                    if len(chunk) >= 44 and chunk[:4] == b"RIFF":
+                        channels = struct.unpack_from("<H", chunk, 22)[0]
+                        sample_rate = struct.unpack_from("<I", chunk, 24)[0]
+                        sample_width = struct.unpack_from("<H", chunk, 34)[0] // 8
+                        pcm_data = chunk[44:]  # Skip WAV header
+                        header_parsed = True
+                        logger.debug("Stream WAV header: sr=%d, ch=%d, sw=%d", sample_rate, channels, sample_width)
+                    else:
+                        pcm_data = chunk
+                        header_parsed = True
+                else:
+                    pcm_data = chunk
+
+                if not pcm_data:
+                    continue
+
+                # Create output stream on first PCM data
+                if stream is None:
+                    stream = sd.OutputStream(
+                        samplerate=sample_rate,
+                        channels=channels,
+                        dtype="int16" if sample_width == 2 else "int32",
+                        device=self.device_index,
+                    )
+                    stream.start()
+                    logger.info("Streaming audio playback started (sr=%d)", sample_rate)
+
+                # Convert bytes to numpy and write
+                dtype = np.int16 if sample_width == 2 else np.int32
+                samples = np.frombuffer(pcm_data, dtype=dtype)
+                if channels > 1:
+                    samples = samples.reshape(-1, channels)
+                else:
+                    samples = samples.reshape(-1, 1)
+                stream.write(samples)
+
+            if stream:
+                stream.stop()
+                stream.close()
+            return True
+
+        except Exception as e:
+            logger.error("Streaming playback error: %s", e)
+            if stream:
+                try:
+                    stream.stop()
+                    stream.close()
+                except Exception:
+                    pass
             return False
 
     def stop(self) -> None:

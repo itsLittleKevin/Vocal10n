@@ -33,14 +33,14 @@ class TTSConfig:
 
     # Output settings
     output_lang: str = "en"
-    streaming_mode: int = 0  # 0=off, 1=best, 2=medium, 3=fast
-    speed_factor: float = 1.0
+    streaming_mode: int = 3  # 0=off, 1=best, 2=medium, 3=fast (lowest first-byte latency)
+    speed_factor: float = 1.2
 
     # Quality settings
-    top_k: int = 15
-    top_p: float = 1.0
-    temperature: float = 1.0
-    text_split_method: str = "cut5"
+    top_k: int = 5
+    top_p: float = 0.7
+    temperature: float = 0.5
+    text_split_method: str = "cut0"
     batch_size: int = 1
 
     @property
@@ -209,7 +209,7 @@ class GPTSoVITSClient:
             "text_split_method": cfg.text_split_method,
             "batch_size": cfg.batch_size,
             "speed_factor": cfg.speed_factor,
-            "streaming_mode": cfg.streaming_mode if streaming else 0,
+            "streaming_mode": cfg.streaming_mode,
             "media_type": "wav",
         }
 
