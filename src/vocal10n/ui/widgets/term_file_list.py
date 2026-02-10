@@ -103,7 +103,7 @@ class TermFileList(QFrame):
         hdr.addWidget(QLabel(f"<b>{title}</b>"))
         hdr.addStretch()
         add_btn = QPushButton("+ Add File")
-        add_btn.setFixedHeight(24)
+        add_btn.setFixedHeight(36)
         add_btn.clicked.connect(self._browse)
         hdr.addWidget(add_btn)
         root.addLayout(hdr)
