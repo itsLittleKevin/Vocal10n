@@ -95,9 +95,13 @@ class MainWindow(QMainWindow):
         s.llm_status_changed.connect(self.section_a.on_llm_status)
         s.tts_status_changed.connect(self.section_a.on_tts_status)
 
-        # Live text → stream panels
-        s.current_stt_text_changed.connect(self.section_a.stt_panel.set_text)
-        s.current_translation_changed.connect(self.section_a.translation_panel.set_text)
+        # Live text → stream panels (upper live panels)
+        s.current_stt_text_changed.connect(self.section_a.stt_live_panel.set_text)
+        s.current_translation_changed.connect(self.section_a.translation_live_panel.set_text)
+
+        # Accumulated text → lower panels
+        s.accumulated_stt_text_changed.connect(self.section_a.stt_accumulated_panel.set_text)
+        s.accumulated_translation_changed.connect(self.section_a.translation_accumulated_panel.set_text)
 
     # ------------------------------------------------------------------
     # GPU polling

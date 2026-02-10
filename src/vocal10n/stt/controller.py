@@ -149,6 +149,8 @@ class STTController(QObject):
 
     def _on_stt_confirmed(self, event) -> None:
         self._state.current_stt_text = event.text
+        # Update accumulated panel with full transcript (with punctuation)
+        self._state.accumulated_stt_text = self._transcript.full_transcript
 
     def _on_stt_pending(self, event) -> None:
         if event.text:

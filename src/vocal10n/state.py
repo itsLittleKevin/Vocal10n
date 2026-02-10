@@ -28,7 +28,9 @@ class SystemState(QObject):
     target_language_changed = Signal(Language)
 
     current_stt_text_changed = Signal(str)
+    accumulated_stt_text_changed = Signal(str)
     current_translation_changed = Signal(str)
+    accumulated_translation_changed = Signal(str)
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -50,7 +52,9 @@ class SystemState(QObject):
 
         # Live text (updated by pipeline workers)
         self._current_stt_text = ""
+        self._accumulated_stt_text = ""
         self._current_translation = ""
+        self._accumulated_translation = ""
 
     # -- Properties with signal emission ------------------------------------
 
@@ -153,6 +157,16 @@ class SystemState(QObject):
             self.current_stt_text_changed.emit(value)
 
     @property
+    def accumulated_stt_text(self) -> str:
+        return self._accumulated_stt_text
+
+    @accumulated_stt_text.setter
+    def accumulated_stt_text(self, value: str) -> None:
+        with self._lock:
+            self._accumulated_stt_text = value
+            self.accumulated_stt_text_changed.emit(value)
+
+    @property
     def current_translation(self) -> str:
         return self._current_translation
 
@@ -161,6 +175,16 @@ class SystemState(QObject):
         with self._lock:
             self._current_translation = value
             self.current_translation_changed.emit(value)
+
+    @property
+    def accumulated_translation(self) -> str:
+        return self._accumulated_translation
+
+    @accumulated_translation.setter
+    def accumulated_translation(self, value: str) -> None:
+        with self._lock:
+            self._accumulated_translation = value
+            self.accumulated_translation_changed.emit(value)
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,13 @@
 """Section A — top portion of the main window.
 
 Layout (horizontal):
-  A1 (≈70 %)  Two side-by-side StreamText panels:
-               • A1a — Source speech (STT output)
-               • A1b — Translation output
+  A1 (≈70 %)  Two side-by-side columns, each split vertically:
+               • Left column  — Source speech
+                   - Upper (30%): Live STT (ephemeral, no punctuation)
+                   - Lower (70%): Accumulated STT (corrected, with punctuation)
+               • Right column — Translation
+                   - Upper (30%): Live translation (ephemeral)
+                   - Lower (70%): Accumulated translation (full history)
   A2 (≈30 %)  Status / metrics column:
                • Module status indicators (STT, LLM, TTS)
                • Latency stats
@@ -41,6 +45,19 @@ def _dot(status: ModelStatus) -> str:
     return f'<span style="color:{c}; font-size:16px;">●</span>'
 
 
+def _text_column(live_title: str, live_placeholder: str,
+                 acc_title: str, acc_placeholder: str) -> tuple[QSplitter, StreamText, StreamText]:
+    """Build a vertical splitter with live (30%) + accumulated (70%) panels."""
+    splitter = QSplitter(Qt.Vertical)
+    live = StreamText(title=live_title, placeholder=live_placeholder)
+    accumulated = StreamText(title=acc_title, placeholder=acc_placeholder)
+    splitter.addWidget(live)
+    splitter.addWidget(accumulated)
+    splitter.setStretchFactor(0, 30)
+    splitter.setStretchFactor(1, 70)
+    return splitter, live, accumulated
+
+
 # ======================================================================
 # Section A
 # ======================================================================
@@ -63,16 +80,28 @@ class SectionA(QWidget):
         a1_lay.setContentsMargins(0, 0, 0, 0)
         a1_lay.setSpacing(4)
 
-        self.stt_panel = StreamText(
-            title="Source Speech",
-            placeholder="Live STT will appear here…",
+        # Left column — Source speech (live + accumulated)
+        stt_col, self.stt_live_panel, self.stt_accumulated_panel = _text_column(
+            live_title="Live STT",
+            live_placeholder="Real-time speech recognition…",
+            acc_title="Source Speech (corrected)",
+            acc_placeholder="Accumulated corrected text will appear here…",
         )
-        self.translation_panel = StreamText(
-            title="Translation",
-            placeholder="Translated text will appear here…",
+        a1_lay.addWidget(stt_col)
+
+        # Right column — Translation (live + accumulated)
+        trans_col, self.translation_live_panel, self.translation_accumulated_panel = _text_column(
+            live_title="Live Translation",
+            live_placeholder="Real-time translation preview…",
+            acc_title="Translation (full)",
+            acc_placeholder="Accumulated translated text will appear here…",
         )
-        a1_lay.addWidget(self.stt_panel)
-        a1_lay.addWidget(self.translation_panel)
+        a1_lay.addWidget(trans_col)
+
+        # Keep backward-compat aliases for existing wiring
+        self.stt_panel = self.stt_live_panel
+        self.translation_panel = self.translation_live_panel
+
         splitter.addWidget(a1)
 
         # ── A2: metrics / status ──────────────────────────────────────
