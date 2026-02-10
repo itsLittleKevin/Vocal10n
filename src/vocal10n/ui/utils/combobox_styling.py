@@ -1,6 +1,6 @@
 """Helper utilities for QComboBox styling."""
 
-from PySide6.QtWidgets import QComboBox, QStyledItemDelegate
+from PySide6.QtWidgets import QComboBox
 from PySide6.QtGui import QPainter, QFont
 from PySide6.QtCore import Qt, QRect
 
@@ -14,6 +14,7 @@ class ArrowComboBox(QComboBox):
 
     def paintEvent(self, event):
         """Override paint to draw Unicode arrow in dropdown area."""
+        # First call parent paint
         super().paintEvent(event)
         
         # Draw the down arrow (▼) in the dropdown button area
@@ -31,10 +32,10 @@ class ArrowComboBox(QComboBox):
         
         # Draw down arrow symbol
         font = self.font()
-        font.setPointSize(11)
+        font.setPointSize(12)
         font.setBold(True)
         painter.setFont(font)
-        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.setPen(self.palette().buttonText().color())
         painter.drawText(
             dropdown_rect,
             Qt.AlignCenter,

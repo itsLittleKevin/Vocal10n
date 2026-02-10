@@ -211,7 +211,8 @@ class STTTab(QWidget):
                     total_terms += sum(1 for line in pp.read_text(encoding="utf-8").splitlines() if line.strip())
             except Exception:
                 pass
-        # Update status label
-        self._term_status.setText(f"Loaded: {total_terms} terms")
+        # Update status label (if it exists)
+        if hasattr(self, '_term_status'):
+            self._term_status.setText(f"Loaded: {total_terms} terms")
         # Emit signal
         self.term_files_changed.emit(paths)

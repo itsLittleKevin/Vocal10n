@@ -4,7 +4,6 @@ from typing import Optional
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
-    QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -13,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from vocal10n.constants import ModelStatus
+from vocal10n.ui.utils.combobox_styling import ArrowComboBox
 
 # Status colour map
 _STATUS_COLOURS = {
@@ -60,10 +60,10 @@ class ModelSelector(QWidget):
         row = QHBoxLayout()
         row.setSpacing(6)
 
-        self._combo = QComboBox()
+        self._combo = ArrowComboBox()
         if items:
             self._combo.addItems(items)
-        self._combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self._combo.setSizeAdjustPolicy(ArrowComboBox.AdjustToContents)
         row.addWidget(self._combo, stretch=1)
 
         # Status indicator (coloured dot via unicode)
@@ -76,13 +76,15 @@ class ModelSelector(QWidget):
         self._load_btn = QPushButton("Load")
         self._load_btn.setProperty("accent", True)
         self._load_btn.setMinimumWidth(70)
-        self._load_btn.setFixedHeight(28)
+        self._load_btn.setFixedHeight(32)
+        self._load_btn.setStyleSheet("padding: 8px 12px;")
         self._load_btn.clicked.connect(self._on_load)
         row.addWidget(self._load_btn)
 
         self._unload_btn = QPushButton("Unload")
         self._unload_btn.setMinimumWidth(70)
-        self._unload_btn.setFixedHeight(28)
+        self._unload_btn.setFixedHeight(32)
+        self._unload_btn.setStyleSheet("padding: 8px 12px;")
         self._unload_btn.setEnabled(False)
         self._unload_btn.clicked.connect(self._on_unload)
         row.addWidget(self._unload_btn)
