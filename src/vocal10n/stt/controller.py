@@ -94,12 +94,14 @@ class STTController(QObject):
                     pass
 
         # Build initial_prompt for Whisper (helps bias recognition)
+        cfg = get_config()
+        capacity = cfg.get("stt.initial_prompt_capacity", 200)
         if all_terms:
-            self._initial_prompt = "，".join(all_terms[:200])  # cap at ~200 terms
+            self._initial_prompt = "，".join(all_terms[:capacity])
         else:
             self._initial_prompt = ""
-        logger.info("Term files updated: %d files, %d terms, prompt=%d chars",
-                     len(paths), len(all_terms), len(self._initial_prompt))
+        logger.info("Term files updated: %d files, %d terms, %d in prompt, prompt=%d chars",
+                     len(paths), len(all_terms), min(len(all_terms), capacity), len(self._initial_prompt))
 
     # ------------------------------------------------------------------
     # Model lifecycle (called from STT tab)

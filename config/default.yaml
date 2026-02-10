@@ -49,6 +49,10 @@ stt:
   language: null
   use_simplified_chinese: true
 
+  # Recognition context / term files
+  initial_prompt_capacity: 200   # Max terms to include in Whisper's initial_prompt
+  beam_size: 1
+
 # --- Translation (Qwen3-4B via llama-cpp) -----------------------------------
 translation:
   backend: "local"           # "local" (GGUF via llama-cpp) or "api" (OpenAI-compatible)
