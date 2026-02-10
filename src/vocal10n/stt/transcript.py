@@ -113,6 +113,15 @@ class TranscriptManager:
             logger.debug("Filtered (duplicate): '%s'", text.strip())
             return False
 
+        # Short-phrase consecutive dedup:
+        # If a very short phrase (≤4 chars) was already confirmed recently, skip.
+        text_clean_check = self._filters.strip_punctuation(text).strip()
+        if text_clean_check and len(text_clean_check) <= 4 and self.segments:
+            for prev in self.segments[-3:]:
+                if prev.text_clean == text_clean_check:
+                    logger.debug("Filtered (short repeat): '%s'", text.strip())
+                    return False
+
         # -- Pause-based punctuation upgrade ---
         if self.segments:
             prev = self.segments[-1]

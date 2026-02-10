@@ -242,10 +242,10 @@ class STTFilters:
         start: float,
         end: float,
         history: list[dict],
-        look_back: int = 3,
+        look_back: int = 5,
     ) -> bool:
         """``True`` if *text* is a near-duplicate of a recent segment
-        (by timestamp overlap + text similarity)."""
+        (by timestamp overlap OR temporal proximity + text similarity)."""
         if not history:
             return False
         clean = _strip_punct(text).lower().strip()
@@ -253,11 +253,11 @@ class STTFilters:
             return True
         for seg in history[-look_back:]:
             seg_clean = _strip_punct(seg["text"]).lower().strip()
+
+            # Timestamp overlap check (original logic)
             o_start = max(start, seg["start"])
             o_end = min(end, seg["end"])
-            if o_end <= o_start:
-                continue
-            overlap = o_end - o_start
+            overlap = max(0.0, o_end - o_start)
             dur = end - start
             if dur > 0 and overlap / dur > 0.7:
                 if clean == seg_clean:
@@ -267,6 +267,16 @@ class STTFilters:
                     longer = max(len(clean), len(seg_clean))
                     if shorter / longer > 0.7:
                         return True
+
+            # Adjacent / temporally-close segments with same text
+            # Catches re-transcription of the same audio region across passes
+            gap = start - seg["end"]
+            if -0.5 <= gap < 2.0:
+                if clean == seg_clean:
+                    return True
+                # Short phrase that is a substring of recent confirmed text
+                if len(clean) <= 6 and clean in seg_clean:
+                    return True
         return False
 
     # ══════════════════════════════════════════════════════════════════
