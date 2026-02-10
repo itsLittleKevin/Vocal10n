@@ -199,15 +199,15 @@ logs/
 - [x] 1.7 — Implement `utils/logger.py` — logging config
 
 ### Phase 2: PySide6 UI Shell
-- [ ] 2.1 — `app.py` — QApplication entry, theme loading
-- [ ] 2.2 — `ui/main_window.py` — Main window with A/B vertical split
-- [ ] 2.3 — `ui/section_a.py` — A1 (streaming text panels) + A2 (metrics/status)
-- [ ] 2.4 — `ui/section_b.py` — QTabWidget container
-- [ ] 2.5 — `ui/widgets/stream_text.py` — Streaming text display widget
-- [ ] 2.6 — `ui/widgets/param_slider.py` — Slider with info tooltip + reset
-- [ ] 2.7 — `ui/widgets/model_selector.py` — Model dropdown + load/unload buttons
-- [ ] 2.8 — `ui/styles/theme.qss` — Base dark theme stylesheet
-- [ ] 2.9 — Verify UI shell launches and looks correct
+- [x] 2.1 — `app.py` — QApplication entry, theme loading
+- [x] 2.2 — `ui/main_window.py` — Main window with A/B vertical split
+- [x] 2.3 — `ui/section_a.py` — A1 (streaming text panels) + A2 (metrics/status)
+- [x] 2.4 — `ui/section_b.py` — QTabWidget container
+- [x] 2.5 — `ui/widgets/stream_text.py` — Streaming text display widget
+- [x] 2.6 — `ui/widgets/param_slider.py` — Slider with info tooltip + reset
+- [x] 2.7 — `ui/widgets/model_selector.py` — Model dropdown + load/unload buttons
+- [x] 2.8 — `ui/styles/theme.qss` — Base dark theme stylesheet
+- [x] 2.9 — Verify UI shell launches and looks correct
 
 ### Phase 3: STT Module (FasterWhisper)
 - [ ] 3.1 — `stt/audio_capture.py` — Microphone capture with device selection
