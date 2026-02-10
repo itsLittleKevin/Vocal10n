@@ -17,6 +17,7 @@ from vocal10n.llm.controller import LLMController
 from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
 from vocal10n.stt.controller import STTController
+from vocal10n.tts.controller import TTSController
 from vocal10n.ui.section_a import SectionA
 from vocal10n.ui.section_b import SectionB
 from vocal10n.utils.gpu import get_gpu_monitor
@@ -86,6 +87,15 @@ class MainWindow(QMainWindow):
         self.section_a.stt_accumulated_panel.text_submitted.connect(
             self._llm_ctrl.translate_manual_text
         )
+
+        # ── TTS controller ────────────────────────────────────────────
+        self._tts_ctrl = TTSController(state, parent=self)
+
+        # Connect TTS tab signals → controller
+        tts_tab = self.section_b.tts_tab
+        tts_tab.start_server_requested.connect(self._tts_ctrl.start_server)
+        tts_tab.stop_server_requested.connect(self._tts_ctrl.stop_server)
+        tts_tab.reference_changed.connect(self._tts_ctrl.set_reference_audio)
 
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)
@@ -166,6 +176,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
+        self._tts_ctrl.shutdown()
         self._llm_ctrl.shutdown()
         self._stt_ctrl.shutdown()
         super().closeEvent(event)

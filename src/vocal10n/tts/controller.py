@@ -1,0 +1,189 @@
+"""TTS controller — lifecycle and pipeline integration.
+
+Owns GPT-SoVITS server management and audio playback queuing.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Optional
+
+from PySide6.QtCore import QObject, Slot
+
+from vocal10n.config import get_config
+from vocal10n.constants import ModelStatus
+from vocal10n.state import SystemState
+from vocal10n.tts.audio_output import AudioPlayer
+from vocal10n.tts.client import GPTSoVITSClient, TTSConfig
+from vocal10n.tts.queue import TTSQueue
+from vocal10n.tts.server_manager import GPTSoVITSServer
+
+logger = logging.getLogger(__name__)
+
+
+class TTSController(QObject):
+    """Manages TTS lifecycle: server start/stop, synthesis queue, and playback."""
+
+    def __init__(self, state: SystemState, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        self._state = state
+        self._cfg = get_config()
+
+        # TTS components (lazy init)
+        self._server: Optional[GPTSoVITSServer] = None
+        self._client: Optional[GPTSoVITSClient] = None
+        self._queue: Optional[TTSQueue] = None
+        self._player: Optional[AudioPlayer] = None
+
+    # ------------------------------------------------------------------
+    # Server lifecycle
+    # ------------------------------------------------------------------
+
+    @Slot()
+    def start_server(self) -> None:
+        """Start the GPT-SoVITS API server subprocess."""
+        if self._state.tts_status == ModelStatus.LOADED:
+            logger.info("TTS server already running")
+            return
+
+        self._state.tts_status = ModelStatus.LOADING
+        logger.info("Starting GPT-SoVITS server...")
+
+        try:
+            host = self._cfg.get("tts.api_host", "127.0.0.1")
+            port = self._cfg.get("tts.api_port", 9880)
+
+            self._server = GPTSoVITSServer(host=host, port=port)
+            if not self._server.start(wait_ready=True):
+                raise RuntimeError("Server did not become ready")
+
+            # Initialize client
+            self._client = GPTSoVITSClient(self._build_config())
+            self._client.check_health()
+
+            # Initialize player
+            self._player = AudioPlayer()
+
+            # Initialize queue
+            self._queue = TTSQueue(self._client, max_size=10)
+            self._queue.start(self._on_audio_ready)
+
+            self._state.tts_status = ModelStatus.LOADED
+            logger.info("TTS server started successfully")
+
+        except Exception as e:
+            logger.exception("Failed to start TTS server: %s", e)
+            self._state.tts_status = ModelStatus.ERROR
+
+    @Slot()
+    def stop_server(self) -> None:
+        """Stop the GPT-SoVITS server and cleanup."""
+        self._state.tts_status = ModelStatus.UNLOADING
+        logger.info("Stopping TTS server...")
+
+        try:
+            if self._queue:
+                self._queue.stop()
+                self._queue = None
+
+            if self._player:
+                self._player.stop()
+                self._player = None
+
+            if self._server:
+                self._server.stop()
+                self._server = None
+
+            self._client = None
+            self._state.tts_status = ModelStatus.UNLOADED
+            logger.info("TTS server stopped")
+
+        except Exception as e:
+            logger.exception("Error stopping TTS server: %s", e)
+            self._state.tts_status = ModelStatus.ERROR
+
+    # ------------------------------------------------------------------
+    # Synthesis
+    # ------------------------------------------------------------------
+
+    def synthesize(self, text: str, language: str) -> bool:
+        """Queue text for synthesis.
+
+        Args:
+            text: Text to synthesize.
+            language: Language code (en, zh, ja, etc.).
+
+        Returns:
+            True if queued successfully.
+        """
+        if self._state.tts_status != ModelStatus.LOADED:
+            logger.warning("TTS not ready, cannot synthesize")
+            return False
+
+        if not self._queue:
+            return False
+
+        return self._queue.enqueue(text, language)
+
+    def speak_source(self, text: str) -> bool:
+        """Speak source text if enabled."""
+        if not self._state.tts_source_enabled:
+            return False
+        lang = self._state.source_language.value.lower()[:2]
+        return self.synthesize(text, lang)
+
+    def speak_target(self, text: str) -> bool:
+        """Speak target (translated) text if enabled."""
+        if not self._state.tts_target_enabled:
+            return False
+        lang = self._state.target_language.value.lower()[:2]
+        return self.synthesize(text, lang)
+
+    # ------------------------------------------------------------------
+    # Reference audio
+    # ------------------------------------------------------------------
+
+    @Slot(str, str, str)
+    def set_reference_audio(self, path: str, text: str, language: str) -> None:
+        """Update reference audio for voice cloning."""
+        if self._client:
+            lang_code = language.lower()[:2] if language else "en"
+            self._client.set_reference_audio(path, text, lang_code)
+        # Save to config
+        self._cfg.set("tts.ref_audio_path", path)
+        self._cfg.set("tts.ref_audio_text", text)
+        self._cfg.set("tts.ref_audio_lang", language)
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    def _build_config(self) -> TTSConfig:
+        """Build TTSConfig from application config."""
+        return TTSConfig(
+            api_host=self._cfg.get("tts.api_host", "127.0.0.1"),
+            api_port=self._cfg.get("tts.api_port", 9880),
+            ref_audio_path=self._cfg.get("tts.ref_audio_path", ""),
+            ref_audio_text=self._cfg.get("tts.ref_audio_text", ""),
+            ref_audio_lang=self._cfg.get("tts.ref_audio_lang", "en"),
+            output_lang=self._cfg.get("tts.output_lang", "en"),
+            speed_factor=self._cfg.get("tts.speed_factor", 1.0),
+            top_k=self._cfg.get("tts.top_k", 15),
+            top_p=self._cfg.get("tts.top_p", 1.0),
+            temperature=self._cfg.get("tts.temperature", 1.0),
+        )
+
+    def _on_audio_ready(self, result: dict) -> None:
+        """Called by queue worker when audio is ready."""
+        audio_data = result.get("audio_data")
+        if audio_data and self._player:
+            self._player.play(audio_data, blocking=False)
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def shutdown(self) -> None:
+        """Stop everything on application exit."""
+        self.stop_server()

@@ -23,6 +23,8 @@ class SystemState(QObject):
     stt_enabled_changed = Signal(bool)
     llm_enabled_changed = Signal(bool)
     tts_enabled_changed = Signal(bool)
+    tts_source_enabled_changed = Signal(bool)
+    tts_target_enabled_changed = Signal(bool)
 
     source_language_changed = Signal(Language)
     target_language_changed = Signal(Language)
@@ -45,6 +47,8 @@ class SystemState(QObject):
         self._stt_enabled = False
         self._llm_enabled = False
         self._tts_enabled = False
+        self._tts_source_enabled = False
+        self._tts_target_enabled = True  # Default: speak translated text
 
         # Languages
         self._source_language = Language.AUTO
@@ -123,6 +127,28 @@ class SystemState(QObject):
             if self._tts_enabled != value:
                 self._tts_enabled = value
                 self.tts_enabled_changed.emit(value)
+
+    @property
+    def tts_source_enabled(self) -> bool:
+        return self._tts_source_enabled
+
+    @tts_source_enabled.setter
+    def tts_source_enabled(self, value: bool) -> None:
+        with self._lock:
+            if self._tts_source_enabled != value:
+                self._tts_source_enabled = value
+                self.tts_source_enabled_changed.emit(value)
+
+    @property
+    def tts_target_enabled(self) -> bool:
+        return self._tts_target_enabled
+
+    @tts_target_enabled.setter
+    def tts_target_enabled(self, value: bool) -> None:
+        with self._lock:
+            if self._tts_target_enabled != value:
+                self._tts_target_enabled = value
+                self.tts_target_enabled_changed.emit(value)
 
     @property
     def source_language(self) -> Language:
