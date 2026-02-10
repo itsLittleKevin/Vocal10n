@@ -48,8 +48,9 @@ class LLMTranslator:
         cfg = get_config()
         self._target_lang: str = cfg.get("translation.target_language", "English")
 
-        # Corrector — glossary-based STT correction hints
-        self._corrector = Corrector()
+        # Corrector — glossary-based STT correction hints (auto-switches to RAG for large glossaries)
+        rag_threshold = cfg.get("translation.rag_threshold", 100)
+        self._corrector = Corrector(rag_threshold=rag_threshold)
         self._load_glossaries()
 
         # Debouncing for pending text

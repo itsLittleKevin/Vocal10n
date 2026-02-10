@@ -63,7 +63,7 @@ translation:
 
   # llama-cpp settings (local backend only)
   n_gpu_layers: -1          # All layers on GPU
-  n_ctx: 128
+  n_ctx: 512
   n_batch: 8
   n_threads: 4
 
@@ -83,6 +83,7 @@ translation:
   target_language: "English"
   auto_detect_source: true
   context_window_size: 2         # Number of previous translations for context
+  rag_threshold: 100             # Use vector retrieval when glossary exceeds this many terms
 
 # --- TTS (GPT-SoVITS) ------------------------------------------------------
 tts:

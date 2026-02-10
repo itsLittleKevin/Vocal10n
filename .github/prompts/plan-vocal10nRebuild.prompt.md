@@ -228,7 +228,7 @@ logs/
 - [x] 4.1 — `llm/engine.py` — llama-cpp-python model loader (port from prebuild)
 - [x] 4.2 — `llm/translator.py` — Translation logic with prompt templates
 - [x] 4.3 — `llm/corrector.py` — Glossary-based correction + prompt augmentation
-- [ ] 4.4 — `llm/rag.py` — Knowledge base integration (deferred)
+- [x] 4.4 — `llm/rag.py` — Vector retrieval for large glossaries (FAISS + MiniLM)
 - [x] 4.5 — `ui/tabs/translation_tab.py` — Translation tab (toggle, lang select, prompt editor, term file list, params)
 - [x] 4.6 — Wire LLM to pipeline: STT events → translate → display in A1b
 - [x] 4.6a — `llm/api_backend.py` — HTTP API backend for remote LLM servers
@@ -311,7 +311,7 @@ Priority 2 — STT accuracy:
 
 Priority 3 — Translation quality:
 - [ ] 10.7 — Retranslation-on-extend (cancel in-flight translation when segment grows)
-- [ ] 10.8 — Phase 4.4: RAG knowledge base for specialized domains
+- [x] 10.8 — Phase 4.4: RAG vector retrieval for large glossaries (implemented)
 
 ---
 
@@ -332,6 +332,8 @@ scipy==1.17.0
 opencc-python-reimplemented==0.1.7
 pypinyin==0.55.0
 llama-cpp-python==0.3.16    # with CUDA support (--extra-index-url)
+sentence-transformers>=2.2.0  # RAG embeddings (CPU-only, optional)
+faiss-cpu>=1.7.0              # RAG vector search (optional)
 flask==3.1.2
 flask-cors==6.0.2
 ```
@@ -375,3 +377,5 @@ flask-cors==6.0.2
 7. **TTS queue pruning** — Queue drops oldest items when depth exceeds `max_pending` (default 3). Prevents backlog buildup during fast speech. Combined with larger translation segments (min 8 chars) to reduce TTS call count.
 
 8. **Translation context window** — Last N confirmed translations passed as context in the LLM prompt for cross-segment coherence.
+
+9. **RAG vector retrieval** — When glossary exceeds `rag_threshold` (default 100 terms), `Corrector` auto-switches from O(n) pinyin scan to FAISS vector search via `RAGIndex`. Uses `all-MiniLM-L6-v2` embedding model on CPU (~80 MB, no VRAM cost). Index is cached to `knowledge_base/*.faiss`/`*.npy` for fast reload. Gracefully degrades to pinyin scan if deps not installed.

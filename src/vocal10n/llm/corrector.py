@@ -5,6 +5,10 @@ into the translation prompt.  No separate LLM call is needed; the
 corrector builds a compact glossary snippet that the translator embeds
 in the prompt so the LLM can fix STT errors in-context.
 
+When the glossary exceeds ``rag_threshold`` terms (default 100), the
+corrector delegates retrieval to :class:`RAGIndex` (FAISS + MiniLM)
+for O(1) vector search instead of O(n) pinyin scanning.
+
 Glossary file format (one entry per line):
     source_term|preferred_translation
     科技小院|Science and Technology Courtyard
@@ -31,13 +35,22 @@ except ImportError:
 
 
 class Corrector:
-    """Glossary-based STT correction and prompt augmentation."""
+    """Glossary-based STT correction and prompt augmentation.
 
-    def __init__(self) -> None:
+    Automatically switches between pinyin scan (<threshold terms) and
+    vector retrieval (>=threshold terms) based on glossary size.
+    """
+
+    def __init__(self, rag_threshold: int = 100) -> None:
         # term → preferred translation (or empty string)
         self._glossary: dict[str, str] = {}
         # pinyin index for fuzzy matching
         self._term_pinyin: dict[str, str] = {}
+        # RAG — lazy init, only used when term count >= threshold
+        self._rag_threshold = rag_threshold
+        self._rag = None  # RAGIndex instance (lazy)
+        self._rag_enabled = False
+        self._cache_dir: Path | None = None
 
     # ------------------------------------------------------------------
     # Loading
@@ -73,14 +86,43 @@ class Corrector:
         return count
 
     def load_glossary_dir(self, directory: str | Path) -> int:
-        """Load all ``.txt`` glossary files from *directory*."""
+        """Load all ``.txt`` glossary files from *directory*.
+
+        If term count exceeds ``rag_threshold``, builds a vector index
+        for fast retrieval.
+        """
         d = Path(directory)
         if not d.is_dir():
             return 0
+        self._cache_dir = d
         total = 0
         for f in sorted(d.glob("*.txt")):
             total += self.load_glossary(f)
+
+        # Build RAG index if we have enough terms
+        if total >= self._rag_threshold:
+            self._build_rag_index()
+
         return total
+
+    def _build_rag_index(self) -> None:
+        """Build FAISS vector index from current glossary."""
+        try:
+            from vocal10n.llm.rag import RAGIndex
+        except ImportError:
+            logger.info("RAG dependencies not available, using pinyin scan")
+            return
+
+        logger.info("Building RAG index for %d terms...", len(self._glossary))
+        self._rag = RAGIndex(cache_dir=self._cache_dir)
+        self._rag.add_terms(list(self._glossary.items()))
+        if self._rag.build():
+            self._rag_enabled = True
+            logger.info("RAG index ready — vector search enabled")
+        else:
+            self._rag = None
+            self._rag_enabled = False
+            logger.info("RAG build failed, falling back to pinyin scan")
 
     # ------------------------------------------------------------------
     # Matching
@@ -89,11 +131,20 @@ class Corrector:
     def find_relevant_terms(self, text: str, max_terms: int = 8) -> list[tuple[str, str]]:
         """Return glossary entries relevant to *text*.
 
-        Matches by substring (exact) and pinyin similarity (fuzzy).
+        Uses vector search (RAG) when available, otherwise falls back
+        to substring + pinyin similarity matching.
         Returns list of (source_term, preferred_translation) tuples.
         """
         if not self._glossary:
             return []
+
+        # Fast path: vector retrieval for large glossaries
+        if self._rag_enabled and self._rag is not None:
+            rag_results = self._rag.search(text, top_k=max_terms, min_score=0.3)
+            if rag_results:
+                return [(t, tr) for t, tr, _ in rag_results]
+
+        # Fallback: O(n) scan with exact + pinyin matching
 
         matches: list[tuple[str, str, float]] = []  # (term, translation, score)
 
@@ -169,3 +220,17 @@ class Corrector:
     @property
     def term_count(self) -> int:
         return len(self._glossary)
+
+    @property
+    def using_rag(self) -> bool:
+        """True if vector retrieval is active."""
+        return self._rag_enabled
+
+    def clear(self) -> None:
+        """Release all resources."""
+        self._glossary.clear()
+        self._term_pinyin.clear()
+        if self._rag:
+            self._rag.clear()
+            self._rag = None
+        self._rag_enabled = False
