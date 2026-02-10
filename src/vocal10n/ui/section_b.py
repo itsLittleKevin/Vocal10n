@@ -11,6 +11,7 @@ from vocal10n.state import SystemState
 from vocal10n.ui.tabs.obs_tab import OBSTab
 from vocal10n.ui.tabs.output_tab import OutputTab
 from vocal10n.ui.tabs.stt_tab import STTTab
+from vocal10n.ui.tabs.training_tab import TrainingTab
 from vocal10n.ui.tabs.translation_tab import TranslationTab
 from vocal10n.ui.tabs.tts_tab import TTSTab
 
@@ -62,6 +63,7 @@ class SectionB(QTabWidget):
         # Phase 7: real OBS tab
         self.obs_tab = OBSTab(state)
         self.addTab(_scrollable(self.obs_tab), "OBS")
-        self.addTab(
-            _placeholder("Training tools will appear here (Phase 8)"), "Training"
-        )
+
+        # Phase 8: training placeholder tab
+        self.training_tab = TrainingTab(state)
+        self.addTab(_scrollable(self.training_tab), "Training")

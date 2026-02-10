@@ -211,9 +211,17 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
-        self._obs_server.stop()
-        self._coordinator.shutdown()
-        self._tts_ctrl.shutdown()
-        self._llm_ctrl.shutdown()
-        self._stt_ctrl.shutdown()
+        self._gpu_timer.stop()
+        for shutdown_fn in (
+            self._obs_server.stop,
+            self._coordinator.shutdown,
+            self._tts_ctrl.shutdown,
+            self._llm_ctrl.shutdown,
+            self._stt_ctrl.shutdown,
+            lambda: get_gpu_monitor().shutdown(),
+        ):
+            try:
+                shutdown_fn()
+            except Exception:
+                pass
         super().closeEvent(event)

@@ -254,11 +254,11 @@ logs/
 - [x] 7.4 — Test: OBS Browser Source displays live subtitles
 
 ### Phase 8: Launch Scripts & Polish
-- [ ] 8.1 — `start.ps1` / `start.bat` — Launch TTS server + main app
-- [ ] 8.2 — A2 section: live GPU metrics, latency display, module status indicators
-- [ ] 8.3 — Error handling and graceful shutdown
-- [ ] 8.4 — Manual A1a input mode (standalone translator when STT is off)
-- [ ] 8.5 — `ui/tabs/training_tab.py` — Training placeholder tab
+- [x] 8.1 — `start.ps1` / `start.bat` — Launch TTS server + main app
+- [x] 8.2 — A2 section: live GPU metrics, latency display, module status indicators
+- [x] 8.3 — Error handling and graceful shutdown
+- [x] 8.4 — Manual A1a input mode (standalone translator when STT is off)
+- [x] 8.5 — `ui/tabs/training_tab.py` — Training placeholder tab
 
 ### Phase 9: Testing & Documentation
 - [ ] 9.1 — End-to-end test: speech → subtitles → translation → TTS
