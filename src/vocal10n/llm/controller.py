@@ -5,6 +5,8 @@ Mirrors the STTController pattern.
 """
 
 import logging
+import threading
+import time
 
 from PySide6.QtCore import QObject, Slot
 
@@ -122,6 +124,36 @@ class LLMController(QObject):
         if self._translator:
             self._translator.target_language = language
         get_config().set("translation.target_language", language)
+
+    # ------------------------------------------------------------------
+    # Manual translation (no STT, user types source text)
+    # ------------------------------------------------------------------
+
+    @Slot(str)
+    def translate_manual_text(self, text: str) -> None:
+        """Translate manually entered text (standalone translator mode)."""
+        if not self._engine.is_loaded:
+            return
+        t = threading.Thread(
+            target=self._do_manual_translate,
+            args=(text,),
+            daemon=True,
+        )
+        t.start()
+
+    def _do_manual_translate(self, text: str) -> None:
+        cfg = get_config()
+        target_lang = cfg.get("translation.target_language", "English")
+        try:
+            t0 = time.perf_counter()
+            result = self._engine.translate(text, target_lang)
+            dt_ms = (time.perf_counter() - t0) * 1000
+            if result:
+                self._state.current_translation = result
+                self._state.accumulated_translation = result
+                self._latency.record_translation(dt_ms)
+        except Exception:
+            logger.exception("Manual translation failed")
 
     # ------------------------------------------------------------------
     # Event handlers (pipeline events → state)

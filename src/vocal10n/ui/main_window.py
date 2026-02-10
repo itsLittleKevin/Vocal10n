@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vocal10n.constants import ModelStatus
 from vocal10n.llm.controller import LLMController
 from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
@@ -80,6 +81,12 @@ class MainWindow(QMainWindow):
         trans_tab._model_sel.load_requested.connect(self._llm_ctrl.load_model)
         trans_tab._model_sel.unload_requested.connect(self._llm_ctrl.unload_model)
         trans_tab.target_language_changed.connect(self._llm_ctrl.set_target_language)
+
+        # Manual input: source panel text → LLM translation
+        self.section_a.stt_accumulated_panel.text_submitted.connect(
+            self._llm_ctrl.translate_manual_text
+        )
+
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)
 
@@ -104,6 +111,10 @@ class MainWindow(QMainWindow):
         s.llm_status_changed.connect(self.section_a.on_llm_status)
         s.tts_status_changed.connect(self.section_a.on_tts_status)
 
+        # Module status → manual input mode toggle
+        s.stt_status_changed.connect(self._update_manual_mode)
+        s.llm_status_changed.connect(self._update_manual_mode)
+
         # Live text → stream panels (upper live panels)
         s.current_stt_text_changed.connect(self.section_a.stt_live_panel.set_text)
         s.current_translation_changed.connect(self.section_a.translation_live_panel.set_text)
@@ -111,6 +122,16 @@ class MainWindow(QMainWindow):
         # Accumulated text → lower panels
         s.accumulated_stt_text_changed.connect(self.section_a.stt_accumulated_panel.set_text)
         s.accumulated_translation_changed.connect(self.section_a.translation_accumulated_panel.set_text)
+
+    # ------------------------------------------------------------------
+    # Manual input mode
+    # ------------------------------------------------------------------
+
+    def _update_manual_mode(self, *_) -> None:
+        """Enable editable source panel when LLM loaded but STT is not."""
+        stt_loaded = self._state.stt_status == ModelStatus.LOADED
+        llm_loaded = self._state.llm_status == ModelStatus.LOADED
+        self.section_a.stt_accumulated_panel.set_editable(llm_loaded and not stt_loaded)
 
     # ------------------------------------------------------------------
     # GPU polling

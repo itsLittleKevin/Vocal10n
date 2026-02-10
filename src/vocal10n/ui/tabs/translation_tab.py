@@ -124,8 +124,7 @@ class TranslationTab(QWidget):
         self._prompt_edit.setMaximumHeight(90)
         default_tmpl = self._cfg.get(
             "translation.prompt_template",
-            "Fix any speech recognition errors and translate to {target_lang}:\n"
-            "{text}\n\nTranslation:",
+            "Fix any speech recognition errors and translate to {target_lang}:\n{text}",
         )
         self._prompt_edit.setPlainText(default_tmpl)
         self._prompt_edit.textChanged.connect(self._on_prompt_changed)

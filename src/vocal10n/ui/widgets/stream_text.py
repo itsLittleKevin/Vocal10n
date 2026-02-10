@@ -1,6 +1,6 @@
 """Streaming text display widget for live STT / translation output."""
 
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, Slot, Signal, QTimer
 from PySide6.QtGui import QTextCursor, QColor, QFont
 from PySide6.QtWidgets import (
     QFrame,
@@ -20,6 +20,9 @@ class StreamText(QFrame):
     - *confirmed* text (normal) — finalised segments appended to history
     """
 
+    # Signals
+    text_submitted = Signal(str)  # Emitted when user finishes typing (manual mode)
+
     # Colours (match theme.qss palette)
     _PENDING_COLOR = QColor("#8892a4")
     _CONFIRMED_COLOR = QColor("#e0e0e0")
@@ -27,6 +30,14 @@ class StreamText(QFrame):
     def __init__(self, title: str = "", placeholder: str = "", parent=None):
         super().__init__(parent)
         self._confirmed_lines: list[str] = []
+        self._editable = False
+        self._orig_placeholder = placeholder
+
+        # Input debounce timer (manual mode)
+        self._input_timer = QTimer(self)
+        self._input_timer.setSingleShot(True)
+        self._input_timer.setInterval(600)
+        self._input_timer.timeout.connect(self._on_input_timeout)
 
         # --- layout ---
         root = QVBoxLayout(self)
@@ -84,6 +95,32 @@ class StreamText(QFrame):
     def clear(self) -> None:
         self._confirmed_lines.clear()
         self._text.clear()
+
+    def set_editable(self, editable: bool) -> None:
+        """Enable/disable manual text input mode."""
+        if self._editable == editable:
+            return
+        self._editable = editable
+        self._text.setReadOnly(not editable)
+        if editable:
+            self._text.setPlaceholderText("Type text here to translate…")
+            self._text.textChanged.connect(self._on_text_changed)
+        else:
+            self._text.setPlaceholderText(self._orig_placeholder)
+            try:
+                self._text.textChanged.disconnect(self._on_text_changed)
+            except RuntimeError:
+                pass
+            self._input_timer.stop()
+
+    def _on_text_changed(self) -> None:
+        if self._editable:
+            self._input_timer.start()
+
+    def _on_input_timeout(self) -> None:
+        text = self._text.toPlainText().strip()
+        if text:
+            self.text_submitted.emit(text)
 
     # ------------------------------------------------------------------
     # Internal

@@ -85,10 +85,15 @@ class LLMEngine:
         t0 = time.perf_counter()
         try:
             self._model(
-                prompt="Translate to English:\n你好\n\nTranslation:",
+                prompt=(
+                    "<|im_start|>system\nYou are a translator.<|im_end|>\n"
+                    "<|im_start|>user\nTranslate to English:\n你好<|im_end|>\n"
+                    "<|im_start|>assistant\n"
+                ),
                 max_tokens=8,
                 temperature=0.0,
                 top_k=1,
+                stop=["<|im_end|>", "\n\n"],
                 echo=False,
             )
         except Exception as e:
@@ -137,8 +142,7 @@ class LLMEngine:
                 top_k=cfg.get("top_k", 1),
                 top_p=cfg.get("top_p", 1.0),
                 repeat_penalty=1.0,
-                stop=["\n\n", "Translate", "Translation:", "Source:",
-                      "Target:", "\nNote:", "\n1.", "\n2."],
+                stop=["<|im_end|>", "\n\n"],
                 echo=False,
             )
         dt = (time.perf_counter() - t0) * 1000
@@ -170,13 +174,21 @@ class LLMEngine:
         cfg = get_config()
         template = cfg.get(
             "translation.prompt_template",
-            "Fix any speech recognition errors and translate to {target_lang}:\n"
-            "{text}\n\nTranslation:",
+            "Fix any speech recognition errors and translate to {target_lang}:\n{text}",
         )
-        return template.format(
+        user_content = template.format(
             target_lang=target_language,
             text=text,
             source_lang=source_lang,
+        )
+        # Qwen3 ChatML format (non-thinking Instruct model)
+        return (
+            "<|im_start|>system\n"
+            "You are a professional translator. "
+            "Output only the corrected translation, nothing else.<|im_end|>\n"
+            "<|im_start|>user\n"
+            f"{user_content}<|im_end|>\n"
+            "<|im_start|>assistant\n"
         )
 
     @staticmethod
