@@ -4,7 +4,8 @@ A QTabWidget that will host settings tabs for each pipeline component.
 Placeholder widgets are replaced as each phase is implemented.
 """
 
-from PySide6.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QScrollArea, QTabWidget, QVBoxLayout, QWidget
 
 from vocal10n.state import SystemState
 from vocal10n.ui.tabs.stt_tab import STTTab
@@ -22,6 +23,16 @@ def _placeholder(text: str) -> QWidget:
     return w
 
 
+def _scrollable(widget: QWidget) -> QScrollArea:
+    """Wrap *widget* in a QScrollArea with vertical scrollbar."""
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    area.setFrameShape(QScrollArea.NoFrame)
+    area.setWidget(widget)
+    return area
+
+
 class SectionB(QTabWidget):
     """Bottom tab container.  Placeholder tabs are swapped out as each
     phase implements real content."""
@@ -31,11 +42,11 @@ class SectionB(QTabWidget):
 
         # Phase 3: real STT tab
         self.stt_tab = STTTab(state)
-        self.addTab(self.stt_tab, "STT")
+        self.addTab(_scrollable(self.stt_tab), "STT")
 
         # Phase 4: real Translation tab
         self.translation_tab = TranslationTab(state)
-        self.addTab(self.translation_tab, "Translation")
+        self.addTab(_scrollable(self.translation_tab), "Translation")
         self.addTab(_placeholder("TTS settings will appear here (Phase 5)"), "TTS")
         self.addTab(_placeholder("Output settings will appear here (Phase 6)"), "Output")
         self.addTab(_placeholder("OBS overlay settings will appear here (Phase 7)"), "OBS")
