@@ -7,7 +7,9 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -23,6 +25,8 @@ class TranslationTab(QWidget):
     """Settings tab for the LLM translation module."""
 
     target_language_changed = Signal(str)  # emits language name, e.g. "English"
+    load_requested = Signal(str)
+    unload_requested = Signal()
 
     def __init__(self, state: SystemState, parent=None):
         super().__init__(parent)
@@ -39,13 +43,93 @@ class TranslationTab(QWidget):
         self._enable_cb.toggled.connect(self._on_enable)
         root.addWidget(self._enable_cb)
 
-        # ── Model selector ────────────────────────────────────────────
+        # ── Backend selector ──────────────────────────────────────────
+        backend_box = QGroupBox("Backend")
+        bb_lay = QHBoxLayout(backend_box)
+        self._backend_combo = QComboBox()
+        self._backend_combo.addItems(["Local GGUF", "OpenAI API"])
+        cur_backend = self._cfg.get("translation.backend", "local")
+        if cur_backend == "api":
+            self._backend_combo.setCurrentIndex(1)
+        self._backend_combo.currentIndexChanged.connect(self._on_backend_changed)
+        bb_lay.addWidget(QLabel("Backend:"))
+        bb_lay.addWidget(self._backend_combo, stretch=1)
+        root.addWidget(backend_box)
+
+        # ── Model selector (local mode) ─────────────────────────────
         models = ["Qwen3-4B-Q4_K_M"]
         self._model_sel = ModelSelector(label="LLM Model", items=models)
         root.addWidget(self._model_sel)
 
         # Wire model selector status to state
         self._state.llm_status_changed.connect(self._model_sel.set_status)
+
+        # Forward model selector signals to tab-level signals
+        self._model_sel.load_requested.connect(self.load_requested)
+        self._model_sel.unload_requested.connect(self.unload_requested)
+
+        # ── API settings (API mode) ─────────────────────────────────
+        self._api_group = QGroupBox("API Connection")
+        al = QVBoxLayout(self._api_group)
+
+        url_row = QHBoxLayout()
+        url_row.addWidget(QLabel("URL:"))
+        self._api_url_edit = QLineEdit()
+        self._api_url_edit.setPlaceholderText("http://localhost:1234/v1")
+        self._api_url_edit.setText(
+            self._cfg.get("translation.api_url", "http://localhost:1234/v1"),
+        )
+        url_row.addWidget(self._api_url_edit, stretch=1)
+        al.addLayout(url_row)
+
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("Model:"))
+        self._api_model_edit = QLineEdit()
+        self._api_model_edit.setPlaceholderText("(auto-detect from server)")
+        self._api_model_edit.setText(
+            self._cfg.get("translation.api_model", ""),
+        )
+        model_row.addWidget(self._api_model_edit, stretch=1)
+        al.addLayout(model_row)
+
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("API Key:"))
+        self._api_key_edit = QLineEdit()
+        self._api_key_edit.setPlaceholderText("(optional, for cloud APIs)")
+        self._api_key_edit.setEchoMode(QLineEdit.Password)
+        self._api_key_edit.setText(
+            self._cfg.get("translation.api_key", ""),
+        )
+        key_row.addWidget(self._api_key_edit, stretch=1)
+        al.addLayout(key_row)
+
+        btn_row = QHBoxLayout()
+        self._api_status = QLabel("● Disconnected")
+        self._api_status.setStyleSheet("color: #8892a4;")
+        btn_row.addWidget(self._api_status)
+        btn_row.addStretch()
+        self._api_connect_btn = QPushButton("Connect")
+        self._api_connect_btn.setProperty("accent", True)
+        self._api_connect_btn.setFixedWidth(80)
+        self._api_connect_btn.clicked.connect(self._on_api_connect)
+        btn_row.addWidget(self._api_connect_btn)
+        self._api_disconnect_btn = QPushButton("Disconnect")
+        self._api_disconnect_btn.setFixedWidth(80)
+        self._api_disconnect_btn.setEnabled(False)
+        self._api_disconnect_btn.clicked.connect(self._on_api_disconnect)
+        btn_row.addWidget(self._api_disconnect_btn)
+        al.addLayout(btn_row)
+
+        root.addWidget(self._api_group)
+        self._api_group.hide()  # local mode by default
+
+        # Wire API status feedback
+        self._state.llm_status_changed.connect(self._on_api_status_changed)
+
+        # Apply initial backend visibility
+        if cur_backend == "api":
+            self._model_sel.hide()
+            self._api_group.show()
 
         # ── Target language ───────────────────────────────────────────
         lang_box = QGroupBox("Target Language")
@@ -187,3 +271,45 @@ class TranslationTab(QWidget):
             "translation.prompt_template",
             self._prompt_edit.toPlainText(),
         )
+
+    @Slot(int)
+    def _on_backend_changed(self, index: int) -> None:
+        backend = "api" if index == 1 else "local"
+        self._cfg.set("translation.backend", backend)
+        is_api = index == 1
+        self._model_sel.setVisible(not is_api)
+        self._api_group.setVisible(is_api)
+        self._ctx_slider.setVisible(not is_api)
+
+    @Slot()
+    def _on_api_connect(self) -> None:
+        self._cfg.set("translation.api_url", self._api_url_edit.text())
+        self._cfg.set("translation.api_model", self._api_model_edit.text())
+        self._cfg.set("translation.api_key", self._api_key_edit.text())
+        self.load_requested.emit("api")
+
+    @Slot()
+    def _on_api_disconnect(self) -> None:
+        self.unload_requested.emit()
+
+    @Slot(ModelStatus)
+    def _on_api_status_changed(self, status: ModelStatus) -> None:
+        if self._backend_combo.currentIndex() != 1:
+            return
+        _colours = {
+            ModelStatus.UNLOADED: ("#8892a4", "Disconnected"),
+            ModelStatus.LOADING: ("#f0c030", "Connecting..."),
+            ModelStatus.LOADED: ("#0f9b8e", "Connected"),
+            ModelStatus.UNLOADING: ("#f0c030", "Disconnecting..."),
+            ModelStatus.ERROR: ("#e94560", "Error"),
+        }
+        colour, label = _colours.get(status, ("#8892a4", "Unknown"))
+        self._api_status.setStyleSheet(f"color: {colour};")
+        self._api_status.setText(f"● {label}")
+        is_idle = status in (ModelStatus.UNLOADED, ModelStatus.ERROR)
+        is_loaded = status == ModelStatus.LOADED
+        self._api_connect_btn.setEnabled(is_idle)
+        self._api_disconnect_btn.setEnabled(is_loaded)
+        self._api_url_edit.setEnabled(is_idle)
+        self._api_model_edit.setEnabled(is_idle)
+        self._api_key_edit.setEnabled(is_idle)

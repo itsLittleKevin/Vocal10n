@@ -78,8 +78,8 @@ class MainWindow(QMainWindow):
 
         # Connect Translation tab load/unload → controller
         trans_tab = self.section_b.translation_tab
-        trans_tab._model_sel.load_requested.connect(self._llm_ctrl.load_model)
-        trans_tab._model_sel.unload_requested.connect(self._llm_ctrl.unload_model)
+        trans_tab.load_requested.connect(self._llm_ctrl.load_model)
+        trans_tab.unload_requested.connect(self._llm_ctrl.unload_model)
         trans_tab.target_language_changed.connect(self._llm_ctrl.set_target_language)
 
         # Manual input: source panel text → LLM translation

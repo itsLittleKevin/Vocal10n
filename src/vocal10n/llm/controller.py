@@ -36,7 +36,7 @@ class LLMController(QObject):
         self._state = state
         self._latency = latency
 
-        self._engine = LLMEngine()
+        self._engine = None  # Created on load (LLMEngine or LLMApiBackend)
         self._translator: LLMTranslator | None = None
 
         # Wire state signals
@@ -53,9 +53,19 @@ class LLMController(QObject):
 
     @Slot(str)
     def load_model(self, model_name: str) -> None:
-        """Load the LLM (runs in main thread — fast for cached / mmap)."""
-        if self._engine.is_loaded:
+        """Load the LLM backend (local GGUF or OpenAI-compatible API)."""
+        if self._engine and self._engine.is_loaded:
             return
+
+        cfg = get_config()
+        backend = cfg.get("translation.backend", "local")
+
+        if backend == "api":
+            from vocal10n.llm.api_backend import LLMApiBackend
+            self._engine = LLMApiBackend()
+        else:
+            self._engine = LLMEngine()
+
         self._state.llm_status = ModelStatus.LOADING
         try:
             self._engine.load()
@@ -64,25 +74,28 @@ class LLMController(QObject):
                 self._engine, get_dispatcher(), self._latency,
             )
             self._state.llm_status = ModelStatus.LOADED
-            logger.info("LLM model loaded: %s", model_name)
+            logger.info("LLM backend loaded: %s (%s)", backend, model_name)
         except Exception as e:
+            self._engine = None
             self._state.llm_status = ModelStatus.ERROR
-            logger.exception("Failed to load LLM model: %s", e)
+            logger.exception("Failed to load LLM backend: %s", e)
 
     @Slot()
     def unload_model(self) -> None:
-        """Stop translation + unload LLM model."""
+        """Stop translation + unload LLM backend."""
         self._unsubscribe_stt()
         if self._translator:
             self._translator.reset()
             self._translator = None
         self._state.llm_status = ModelStatus.UNLOADING
         try:
-            self._engine.unload()
+            if self._engine:
+                self._engine.unload()
+                self._engine = None
             self._state.llm_status = ModelStatus.UNLOADED
         except Exception as e:
             self._state.llm_status = ModelStatus.ERROR
-            logger.exception("Failed to unload LLM model: %s", e)
+            logger.exception("Failed to unload LLM backend: %s", e)
 
     # ------------------------------------------------------------------
     # Enable / disable (subscribe to STT events)
@@ -97,7 +110,7 @@ class LLMController(QObject):
 
     def _subscribe_stt(self) -> None:
         """Start listening to STT events for translation."""
-        if not self._engine.is_loaded or self._translator is None:
+        if not self._engine or not self._engine.is_loaded or self._translator is None:
             logger.warning("Cannot enable translation — model not loaded")
             return
         dispatcher = get_dispatcher()
@@ -132,7 +145,7 @@ class LLMController(QObject):
     @Slot(str)
     def translate_manual_text(self, text: str) -> None:
         """Translate manually entered text (standalone translator mode)."""
-        if not self._engine.is_loaded:
+        if not self._engine or not self._engine.is_loaded:
             return
         t = threading.Thread(
             target=self._do_manual_translate,
@@ -177,5 +190,5 @@ class LLMController(QObject):
         self._unsubscribe_stt()
         if self._translator:
             self._translator.reset()
-        if self._engine.is_loaded:
+        if self._engine and self._engine.is_loaded:
             self._engine.unload()

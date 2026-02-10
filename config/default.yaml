@@ -51,13 +51,20 @@ stt:
 
 # --- Translation (Qwen3-4B via llama-cpp) -----------------------------------
 translation:
+  backend: "local"           # "local" (GGUF via llama-cpp) or "api" (OpenAI-compatible)
   model_path: "models/llm/Qwen3-4B-Instruct-2507.Q4_K_M.gguf"
 
-  # llama-cpp settings
+  # llama-cpp settings (local backend only)
   n_gpu_layers: -1          # All layers on GPU
   n_ctx: 128
   n_batch: 8
   n_threads: 4
+
+  # OpenAI-compatible API settings (api backend only)
+  api_url: "http://localhost:1234/v1"
+  api_model: ""              # Empty = auto-detect from server
+  api_key: ""                # Optional, for cloud APIs
+  api_timeout: 10
 
   # Generation
   temperature: 0.0
