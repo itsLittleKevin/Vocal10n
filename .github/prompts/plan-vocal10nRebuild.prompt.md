@@ -227,7 +227,7 @@ logs/
 - [x] 4.6 — Wire LLM to pipeline: STT events → translate → display in A1b
 - [x] 4.6a — `llm/api_backend.py` — HTTP API backend for remote LLM servers
 - [x] 4.6b — `llm/controller.py` — LLM controller (load/unload/translate lifecycle)
-- [ ] 4.7 — Test: standalone mode (manual input → translation output)
+- [x] 4.7 — Test: standalone mode (manual input → translation output)
 
 ### Phase 5: TTS Module (GPT-SoVITS)
 - [x] 5.1 — Copy GPT-SoVITS into `vendor/GPT-SoVITS/`
@@ -238,7 +238,7 @@ logs/
 - [x] 5.6 — `ui/tabs/tts_tab.py` — TTS tab (source/target toggles, ref audio, device select, params)
 - [x] 5.7 — Wire TTS to pipeline: translation events → synthesize → play
 - [x] 5.7a — `tts/controller.py` — TTS controller (server lifecycle, queue, playback)
-- [ ] 5.8 — Test: end-to-end STT → LLM → TTS
+- [x] 5.8 — Test: end-to-end STT → LLM → TTS
 
 ### Phase 6: Pipeline Orchestration
 - [ ] 6.1 — `pipeline/coordinator.py` — Full pipeline coordination (port & clean up from prebuild)
