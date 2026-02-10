@@ -219,12 +219,14 @@ logs/
 - [x] 3.7 — Test: mic → text appearing in A1a with latency metric
 
 ### Phase 4: LLM Translation Module (Qwen3)
-- [ ] 4.1 — `llm/engine.py` — llama-cpp-python model loader (port from prebuild)
-- [ ] 4.2 — `llm/translator.py` — Translation logic with prompt templates
-- [ ] 4.3 — `llm/corrector.py` — Source text correction pass
-- [ ] 4.4 — `llm/rag.py` — Knowledge base integration (stub, then implement)
-- [ ] 4.5 — `ui/tabs/translation_tab.py` — Translation tab (toggle, lang select, prompt editor, RAG mount, params)
-- [ ] 4.6 — Wire LLM to pipeline: STT events → translate → display in A1b
+- [x] 4.1 — `llm/engine.py` — llama-cpp-python model loader (port from prebuild)
+- [x] 4.2 — `llm/translator.py` — Translation logic with prompt templates
+- [ ] 4.3 — `llm/corrector.py` — Source text correction pass (deferred)
+- [ ] 4.4 — `llm/rag.py` — Knowledge base integration (deferred)
+- [x] 4.5 — `ui/tabs/translation_tab.py` — Translation tab (toggle, lang select, prompt editor, term file list, params)
+- [x] 4.6 — Wire LLM to pipeline: STT events → translate → display in A1b
+- [x] 4.6a — `llm/api_backend.py` — HTTP API backend for remote LLM servers
+- [x] 4.6b — `llm/controller.py` — LLM controller (load/unload/translate lifecycle)
 - [ ] 4.7 — Test: standalone mode (manual input → translation output)
 
 ### Phase 5: TTS Module (GPT-SoVITS)
