@@ -1,10 +1,16 @@
+# === Vocal10n Project .gitignore ===
+
 # === Virtual Environments ===
 venvs/
 venv*/
+.venv/
+env/
+ENV/
 __pycache__/
-*.pyc
-*.pyo
+*.py[codz]
+*$py.class
 .env
+.envrc
 
 # === Models (large binaries) ===
 models/**
@@ -38,6 +44,15 @@ output/**
 # === Legacy prebuild ===
 Vocal10n-prebuild/
 
+# === Build / Distribution ===
+build/
+dist/
+*.egg-info/
+*.egg
+*.so
+*.manifest
+*.spec
+
 # === IDE / OS ===
 .vscode/
 .idea/
@@ -45,6 +60,18 @@ Vocal10n-prebuild/
 Thumbs.db
 .DS_Store
 
+# === Testing ===
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
 # === Logs ===
 *.log
 logs/
+
+# === Type checkers ===
+.mypy_cache/
+.pytype/
+.ruff_cache/
