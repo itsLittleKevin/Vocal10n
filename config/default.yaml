@@ -128,9 +128,12 @@ obs:
   port: 5124
   enable_source_subtitle: true
   enable_target_subtitle: true
-  font_family: "Noto Sans"
+  font_family_source: "Noto Sans SC"
+  font_family_target: "Noto Sans"
   font_size_source: 28
   font_size_target: 28
+  color_source: "#FFFFFF"
+  color_target: "#FFE066"
 
 # --- Output Files -----------------------------------------------------------
 output:

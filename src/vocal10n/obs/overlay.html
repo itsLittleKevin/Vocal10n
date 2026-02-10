@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocal10n — OBS Subtitle Overlay</title>
+    <style>
+        /* ============================================================
+           BASE STYLES (overridden by /style.css from server)
+           ============================================================ */
+        :root {
+            --src-font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+            --tgt-font-family: 'Noto Sans', 'Segoe UI', sans-serif;
+            --src-font-size: 28px;
+            --tgt-font-size: 28px;
+            --src-color: #FFFFFF;
+            --tgt-color: #FFE066;
+            --text-shadow: 0 -2px 0 #000, 2px -2px 0 #000, 2px 0 0 #000,
+                           2px 2px 0 #000, 0 2px 0 #000, -2px 2px 0 #000,
+                           -2px 0 0 #000, -2px -2px 0 #000;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: transparent;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .subtitle-container {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 85%;
+            text-align: center;
+            word-wrap: break-word;
+        }
+
+        .subtitle-line {
+            font-weight: 600;
+            line-height: 1.4;
+            text-shadow: var(--text-shadow);
+            margin-bottom: 8px;
+            transition: opacity 0.2s ease;
+        }
+
+        .source-text {
+            font-family: var(--src-font-family);
+            font-size: var(--src-font-size);
+            color: var(--src-color);
+        }
+
+        .translation-text {
+            font-family: var(--tgt-font-family);
+            font-size: var(--tgt-font-size);
+            color: var(--tgt-color);
+        }
+
+        .hidden { opacity: 0; }
+
+        .status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: monospace;
+        }
+        .status.connected { color: #4CAF50; }
+        .status.disconnected { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="status" id="status">Connecting...</div>
+
+    <div class="subtitle-container" id="container">
+        <div class="subtitle-line source-text" id="source"></div>
+        <div class="subtitle-line translation-text" id="translation"></div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            sourceUrl:      '/live-text',
+            translationUrl: '/live-translation',
+            styleUrl:       '/style.css',
+            pollInterval:   200,   // subtitle poll (ms)
+            stylePoll:      2000,  // CSS reload (ms)
+            hideAfterMs:    4000,  // auto-hide after no change
+        };
+
+        const srcEl   = document.getElementById('source');
+        const tgtEl   = document.getElementById('translation');
+        const statEl  = document.getElementById('status');
+
+        let lastSrc = '', lastTgt = '';
+        let hideTimer = null;
+
+        function setStatus(ok) {
+            statEl.className = 'status ' + (ok ? 'connected' : 'disconnected');
+            statEl.textContent = ok ? '● Connected' : '○ Disconnected';
+        }
+
+        function showLines(src, tgt) {
+            const changed = src !== lastSrc || tgt !== lastTgt;
+            if (!changed) return;
+            lastSrc = src; lastTgt = tgt;
+
+            srcEl.textContent = src || '';
+            tgtEl.textContent = tgt || '';
+
+            srcEl.classList.toggle('hidden', !src);
+            tgtEl.classList.toggle('hidden', !tgt);
+
+            // Reset auto-hide timer
+            if (hideTimer) clearTimeout(hideTimer);
+            if (src || tgt) {
+                hideTimer = setTimeout(() => {
+                    srcEl.classList.add('hidden');
+                    tgtEl.classList.add('hidden');
+                }, CONFIG.hideAfterMs);
+            }
+        }
+
+        async function poll() {
+            try {
+                const [sRes, tRes] = await Promise.all([
+                    fetch(CONFIG.sourceUrl),
+                    fetch(CONFIG.translationUrl),
+                ]);
+                if (!sRes.ok || !tRes.ok) throw new Error('HTTP error');
+                const sData = await sRes.json();
+                const tData = await tRes.json();
+                setStatus(true);
+                showLines(sData.text || '', tData.text || '');
+            } catch (_) {
+                setStatus(false);
+            }
+        }
+
+        async function reloadStyle() {
+            try {
+                const r = await fetch(CONFIG.styleUrl + '?t=' + Date.now());
+                if (!r.ok) return;
+                const css = await r.text();
+                let el = document.getElementById('dyn-style');
+                if (!el) {
+                    el = document.createElement('style');
+                    el.id = 'dyn-style';
+                    document.head.appendChild(el);
+                }
+                el.textContent = css;
+            } catch (_) {}
+        }
+
+        setInterval(poll, CONFIG.pollInterval);
+        setInterval(reloadStyle, CONFIG.stylePoll);
+        poll();
+        reloadStyle();
+    </script>
+</body>
+</html>

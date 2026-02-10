@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from vocal10n.constants import ModelStatus
 from vocal10n.llm.controller import LLMController
+from vocal10n.obs.server import OBSSubtitleServer
 from vocal10n.pipeline.coordinator import PipelineCoordinator
 from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
@@ -114,6 +115,10 @@ class MainWindow(QMainWindow):
         output_tab.start_session_requested.connect(self._coordinator.start_session)
         output_tab.stop_session_requested.connect(self._coordinator.stop_session)
 
+        # ── OBS subtitle server ──────────────────────────────────
+        self._obs_server = OBSSubtitleServer()
+        self._obs_server.start()
+
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)
 
@@ -206,6 +211,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
+        self._obs_server.stop()
         self._coordinator.shutdown()
         self._tts_ctrl.shutdown()
         self._llm_ctrl.shutdown()

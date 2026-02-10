@@ -241,11 +241,11 @@ logs/
 - [x] 5.8 — Test: end-to-end STT → LLM → TTS
 
 ### Phase 6: Pipeline Orchestration
-- [ ] 6.1 — `pipeline/coordinator.py` — Full pipeline coordination (port & clean up from prebuild)
-- [ ] 6.2 — `pipeline/file_writer.py` — Async SRT/TXT/WAV file output
-- [ ] 6.3 — `ui/tabs/output_tab.py` — Output settings (checkboxes for each output type)
-- [ ] 6.4 — Wire file outputs to pipeline events
-- [ ] 6.5 — Test: full pipeline with all outputs enabled
+- [x] 6.1 — `pipeline/coordinator.py` — Full pipeline coordination (port & clean up from prebuild)
+- [x] 6.2 — `pipeline/file_writer.py` — Async SRT/TXT/WAV file output
+- [x] 6.3 — `ui/tabs/output_tab.py` — Output settings (checkboxes for each output type)
+- [x] 6.4 — Wire file outputs to pipeline events
+- [x] 6.5 — Test: full pipeline with all outputs enabled
 
 ### Phase 7: OBS Integration
 - [ ] 7.1 — `obs/server.py` — Flask HTTP server for Browser Source
