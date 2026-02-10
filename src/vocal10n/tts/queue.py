@@ -130,10 +130,13 @@ class TTSQueue:
             logger.info("TTS processing: '%s...' (queue: %d)", request["text"][:30], self._queue.qsize())
 
             self._processing = True
+            t0 = time.time()
             result = self.client.synthesize(request["text"], request["language"], streaming=False)
+            dt = time.time() - t0
             self._processing = False
 
             if result["status"] == "success" and self._audio_callback:
+                logger.info("TTS synthesis completed in %.1fs, duration=%.1fms", dt, result.get("duration_ms", 0))
                 self._audio_callback(result)
             elif result["status"] == "error":
-                logger.error("TTS synthesis failed: %s", result.get("message"))
+                logger.error("TTS synthesis failed (%.1fs): %s", dt, result.get("message"))

@@ -68,6 +68,10 @@ class TTSController(QObject):
             self._client = GPTSoVITSClient(self._build_config())
             self._client.check_health()
 
+            # Warmup TTS (first request loads models into GPU memory)
+            logger.info("Warming up TTS model...")
+            self._client.warmup()
+
             # Initialize player
             self._player = AudioPlayer()
 

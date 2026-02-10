@@ -24,7 +24,7 @@ class TTSConfig:
 
     api_host: str = "127.0.0.1"
     api_port: int = 9880
-    api_timeout: int = 30
+    api_timeout: int = 120  # GPT-SoVITS first request can be slow (model warm-up)
 
     # Reference audio
     ref_audio_path: str = ""
@@ -86,6 +86,23 @@ class GPTSoVITSClient:
         except requests.RequestException as e:
             logger.warning("TTS health check failed: %s", e)
             self._is_ready = False
+            return False
+
+    def warmup(self) -> bool:
+        """Perform a warmup synthesis to load models into memory.
+
+        Returns:
+            True if warmup succeeded.
+        """
+        logger.info("TTS warmup: synthesizing test phrase...")
+        t0 = time.time()
+        result = self.synthesize("Hello.", "en", streaming=False)
+        dt = time.time() - t0
+        if result["status"] == "success":
+            logger.info("TTS warmup completed in %.1fs", dt)
+            return True
+        else:
+            logger.warning("TTS warmup failed (%.1fs): %s", dt, result.get("message"))
             return False
 
     def validate_reference_audio(self) -> dict[str, Any]:
