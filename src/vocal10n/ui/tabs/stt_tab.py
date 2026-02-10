@@ -1,6 +1,8 @@
 """STT settings tab for Section B."""
 
-from PySide6.QtCore import Qt, Slot
+from pathlib import Path
+
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,10 +18,13 @@ from vocal10n.constants import Language, ModelStatus
 from vocal10n.state import SystemState
 from vocal10n.ui.widgets.model_selector import ModelSelector
 from vocal10n.ui.widgets.param_slider import ParamSlider
+from vocal10n.ui.widgets.term_file_list import TermFileList
 
 
 class STTTab(QWidget):
     """Settings tab for the Speech-to-Text module."""
+
+    term_files_changed = Signal(list)  # emits list[str] of paths
 
     def __init__(self, state: SystemState, parent=None):
         super().__init__(parent)
@@ -115,6 +120,34 @@ class STTTab(QWidget):
 
         root.addWidget(tune_box)
 
+        # ── Term files (phonetic correction + initial_prompt) ─────────
+        terms_box = QGroupBox("Recognition Context (Term Files)")
+        terms_lay = QVBoxLayout(terms_box)
+        terms_lay.setSpacing(4)
+
+        terms_info = QLabel(
+            "Add term files to improve recognition accuracy. Terms are used for:\n"
+            "• Phonetic correction (fuzzy pinyin matching)\n"
+            "• Whisper initial_prompt context (helps Whisper prefer these terms)\n"
+            "Format: one term per line, plain text, UTF-8."
+        )
+        terms_info.setWordWrap(True)
+        terms_info.setProperty("dim", True)
+        terms_lay.addWidget(terms_info)
+
+        self._term_list = TermFileList(title="Loaded Term Files")
+        self._term_list.files_changed.connect(self._on_term_files_changed)
+        terms_lay.addWidget(self._term_list)
+
+        # Pre-load existing term files from config
+        _project_root = Path(__file__).resolve().parents[4]
+        for default_file in ("config/context_gaming.txt",):
+            fp = _project_root / default_file
+            if fp.exists():
+                self._term_list.add_file(str(fp))
+
+        root.addWidget(terms_box)
+
         # ── Info ──────────────────────────────────────────────────────
         info = QLabel(
             "Settings apply immediately — no model reload needed.\n"
@@ -145,3 +178,7 @@ class STTTab(QWidget):
             self._state.source_language = Language(code)
         except ValueError:
             pass
+
+    @Slot(list)
+    def _on_term_files_changed(self, paths: list[str]) -> None:
+        self.term_files_changed.emit(paths)

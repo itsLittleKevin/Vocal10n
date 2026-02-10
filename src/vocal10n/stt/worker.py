@@ -35,12 +35,14 @@ class STTWorker(QThread):
         capture: AudioCapture,
         engine: STTEngine,
         transcript: TranscriptManager,
+        initial_prompt: str = "",
         parent=None,
     ):
         super().__init__(parent)
         self._capture = capture
         self._engine = engine
         self._transcript = transcript
+        self._initial_prompt = initial_prompt
         self._running = False
 
     # ------------------------------------------------------------------
@@ -66,6 +68,7 @@ class STTWorker(QThread):
         min_dur = cfg.get("stt.min_transcribe_duration", 0.3)
         min_conf = cfg.get("stt.min_confidence_threshold", -2.0)
         max_nsp = cfg.get("stt.max_no_speech_prob", 0.8)
+        max_seg_age = cfg.get("stt.max_segment_age", 2.0)
 
         last_confirmed_end: float = 0.0
         last_transcribe_t: float = 0.0
@@ -88,7 +91,7 @@ class STTWorker(QThread):
                     self.msleep(100)
                     continue
 
-                segments = self._engine.transcribe(audio)
+                segments = self._engine.transcribe(audio, initial_prompt=self._initial_prompt)
                 if not segments:
                     self.msleep(100)
                     continue
@@ -147,6 +150,24 @@ class STTWorker(QThread):
                             if k >= last_confirmed_end - _CACHE_BUCKET
                         }
 
+                # Force-confirm pending segments older than max_segment_age
+                if max_seg_age > 0:
+                    age_cutoff = cur_dur - max_seg_age
+                    for s in pending:
+                        if s.end <= last_confirmed_end + 0.1:
+                            continue
+                        if s.end < age_cutoff:
+                            if s.avg_logprob < min_conf or s.no_speech_prob > max_nsp:
+                                continue
+                            accepted = self._transcript.confirm(
+                                s.text.strip(), s.start, s.end,
+                                confidence=s.avg_logprob,
+                                no_speech_prob=s.no_speech_prob,
+                                word_confidences=s.word_confidences,
+                            )
+                            if accepted:
+                                last_confirmed_end = s.end
+
                 # Update pending display
                 if pending:
                     valid = [
@@ -173,7 +194,7 @@ class STTWorker(QThread):
             # ── Final flush ───────────────────────────────────────────
             audio = self._capture.get_from_offset(last_confirmed_end)
             if len(audio) > self._capture.sample_rate * 0.3:
-                segs = self._engine.transcribe(audio)
+                segs = self._engine.transcribe(audio, initial_prompt=self._initial_prompt)
                 for s in segs:
                     s.start += last_confirmed_end
                     s.end += last_confirmed_end

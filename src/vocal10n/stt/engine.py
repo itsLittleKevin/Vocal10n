@@ -14,6 +14,9 @@ from vocal10n.config import get_config
 
 logger = logging.getLogger(__name__)
 
+# Suppress verbose faster_whisper VAD/processing logs
+logging.getLogger("faster_whisper").setLevel(logging.WARNING)
+
 
 @dataclass
 class SegmentResult:

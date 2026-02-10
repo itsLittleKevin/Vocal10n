@@ -42,11 +42,6 @@ class Language(Enum):
     AUTO = "auto"
     CHINESE = "zh"
     ENGLISH = "en"
-    JAPANESE = "ja"
-    KOREAN = "ko"
-    SPANISH = "es"
-    FRENCH = "fr"
-    GERMAN = "de"
 
     @property
     def display_name(self) -> str:
@@ -54,11 +49,6 @@ class Language(Enum):
             "auto": "Auto-detect",
             "zh": "Chinese",
             "en": "English",
-            "ja": "Japanese",
-            "ko": "Korean",
-            "es": "Spanish",
-            "fr": "French",
-            "de": "German",
         }
         return names.get(self.value, self.value)
 

@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         stt_tab = self.section_b.stt_tab
         stt_tab._model_sel.load_requested.connect(self._stt_ctrl.load_model)
         stt_tab._model_sel.unload_requested.connect(self._stt_ctrl.unload_model)
+        stt_tab.term_files_changed.connect(self._stt_ctrl.update_term_files)
 
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)

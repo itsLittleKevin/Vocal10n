@@ -58,6 +58,10 @@ class STTController(QObject):
         if context_path.exists():
             self._filters.build_phonetic_index(context_path)
 
+        # Term files → phonetic index + initial_prompt for Whisper
+        self._term_files: list[str] = []
+        self._initial_prompt: str = ""
+
         # Wire state signals
         self._state.stt_enabled_changed.connect(self._on_enabled)
 
@@ -65,6 +69,37 @@ class STTController(QObject):
         dispatcher = get_dispatcher()
         dispatcher.subscribe(EventType.STT_CONFIRMED, self._on_stt_confirmed)
         dispatcher.subscribe(EventType.STT_PENDING, self._on_stt_pending)
+
+    # ------------------------------------------------------------------
+    # Term file management
+    # ------------------------------------------------------------------
+
+    @Slot(list)
+    def update_term_files(self, paths: list[str]) -> None:
+        """Rebuild phonetic index and initial_prompt from term files."""
+        self._term_files = list(paths)
+
+        # Rebuild phonetic index from all term files
+        all_terms: list[str] = []
+        for p in paths:
+            pp = Path(p)
+            if pp.exists():
+                self._filters.build_phonetic_index(pp)
+                try:
+                    for line in pp.read_text(encoding="utf-8").splitlines():
+                        line = line.strip()
+                        if line:
+                            all_terms.append(line)
+                except Exception:
+                    pass
+
+        # Build initial_prompt for Whisper (helps bias recognition)
+        if all_terms:
+            self._initial_prompt = "，".join(all_terms[:200])  # cap at ~200 terms
+        else:
+            self._initial_prompt = ""
+        logger.info("Term files updated: %d files, %d terms, prompt=%d chars",
+                     len(paths), len(all_terms), len(self._initial_prompt))
 
     # ------------------------------------------------------------------
     # Model lifecycle (called from STT tab)
@@ -110,7 +145,8 @@ class STTController(QObject):
 
         self._transcript.start_session()
         self._capture.start()
-        self._worker = STTWorker(self._capture, self._engine, self._transcript)
+        self._worker = STTWorker(self._capture, self._engine, self._transcript,
+                                 initial_prompt=self._initial_prompt)
         self._worker.error_occurred.connect(self._on_worker_error)
         self._worker.begin()
 
