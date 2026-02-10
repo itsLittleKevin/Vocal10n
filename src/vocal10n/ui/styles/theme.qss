@@ -160,12 +160,18 @@ QComboBox {
 
 QComboBox:hover {
     border-color: #0f9b8e;
+    background-color: #2d3f5f;
 }
 
 QComboBox::drop-down {
     border: none;
-    width: 24px;
-    background-color: transparent;
+    width: 32px;
+    border-left: 1px solid #2d3f5f;
+    background-color: #1f2b47;
+}
+
+QComboBox::drop-down:hover {
+    background-color: #263250;
 }
 
 QComboBox::down-arrow {
