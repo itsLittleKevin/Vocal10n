@@ -131,12 +131,22 @@ class TTSQueue:
 
             self._processing = True
             t0 = time.time()
-            result = self.client.synthesize(request["text"], request["language"], streaming=False)
+            try:
+                result = self.client.synthesize(request["text"], request["language"], streaming=False)
+            except Exception as e:
+                logger.exception("TTS synthesize exception: %s", e)
+                self._processing = False
+                continue
             dt = time.time() - t0
             self._processing = False
 
-            if result["status"] == "success" and self._audio_callback:
-                logger.info("TTS synthesis completed in %.1fs, duration=%.1fms", dt, result.get("duration_ms", 0))
+            status = result.get("status", "unknown")
+            if status == "success" and self._audio_callback:
+                audio_size = len(result.get("audio_data", b""))
+                logger.info("TTS synthesis completed in %.1fs, duration=%.1fms, audio=%d bytes", 
+                            dt, result.get("duration_ms", 0), audio_size)
                 self._audio_callback(result)
-            elif result["status"] == "error":
+            elif status == "error":
                 logger.error("TTS synthesis failed (%.1fs): %s", dt, result.get("message"))
+            else:
+                logger.warning("TTS unexpected result status: %s, keys: %s", status, list(result.keys()))

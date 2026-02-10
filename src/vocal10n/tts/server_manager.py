@@ -9,6 +9,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -40,6 +41,7 @@ class GPTSoVITSServer:
         self.sovits_path = Path(sovits_path) if sovits_path else _VENDOR_SOVITS
         self.venv_path = Path(venv_path) if venv_path else _VENV_TTS
         self._process: Optional[subprocess.Popen] = None
+        self._stdout_thread: Optional[threading.Thread] = None
         self._startup_timeout = 60  # seconds
 
     @property
@@ -113,6 +115,12 @@ class GPTSoVITSServer:
             logger.exception("Failed to start GPT-SoVITS: %s", e)
             return False
 
+        # Drain subprocess stdout in background to prevent pipe buffer deadlock
+        self._stdout_thread = threading.Thread(
+            target=self._drain_stdout, daemon=True
+        )
+        self._stdout_thread.start()
+
         if wait_ready:
             return self._wait_for_ready()
         return True
@@ -148,6 +156,17 @@ class GPTSoVITSServer:
             return resp.status_code in (200, 400, 422)
         except requests.RequestException:
             return False
+
+    def _drain_stdout(self) -> None:
+        """Read subprocess stdout to prevent pipe buffer deadlock."""
+        tts_logger = logging.getLogger("vocal10n.tts.server")
+        try:
+            for line in self._process.stdout:
+                line = line.rstrip()
+                if line:
+                    tts_logger.debug("[GPT-SoVITS] %s", line)
+        except (ValueError, OSError):
+            pass  # Pipe closed
 
     def stop(self) -> None:
         """Terminate the GPT-SoVITS subprocess."""

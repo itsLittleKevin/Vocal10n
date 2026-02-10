@@ -156,10 +156,11 @@ class GPTSoVITSClient:
         start_time = time.time()
 
         payload = self._build_payload(text, text_lang, streaming)
-        logger.debug("TTS payload: ref=%s, text_lang=%s, prompt_lang=%s",
-                     payload.get("ref_audio_path"), text_lang, payload.get("prompt_lang"))
+        logger.info("TTS request: text='%s...', lang=%s, ref=%s", 
+                    text[:30], text_lang, payload.get("ref_audio_path"))
 
         try:
+            logger.info("TTS calling API: POST %s/tts (timeout=%ds)", self.api_url, self.config.api_timeout)
             resp = requests.post(
                 f"{self.api_url}/tts",
                 json=payload,
@@ -167,6 +168,7 @@ class GPTSoVITSClient:
                 stream=streaming,
             )
             latency_ms = (time.time() - start_time) * 1000
+            logger.info("TTS API response: status=%d, latency=%.1fms", resp.status_code, latency_ms)
 
             if resp.status_code == 200:
                 if streaming:

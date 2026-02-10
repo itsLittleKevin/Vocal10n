@@ -40,6 +40,7 @@ class TTSTab(QWidget):
     start_server_requested = Signal()
     stop_server_requested = Signal()
     reference_changed = Signal(str, str, str)  # path, text, language
+    output_device_changed = Signal(int)  # device index (-1 = default)
 
     def __init__(self, state: SystemState, parent=None):
         super().__init__(parent)
@@ -143,6 +144,7 @@ class TTSTab(QWidget):
         dev_lay.addWidget(QLabel("Device:"))
         self._device_combo = ArrowComboBox()
         self._populate_devices()
+        self._device_combo.currentIndexChanged.connect(self._on_device_changed)
         dev_lay.addWidget(self._device_combo, stretch=1)
         refresh_btn = QPushButton("⟳")
         refresh_btn.setFixedSize(36, 36)
@@ -245,11 +247,18 @@ class TTSTab(QWidget):
         self._cfg.set("tts.ref_audio_lang", lang)
         self.reference_changed.emit(path, text, lang)
 
+    def _on_device_changed(self, index: int) -> None:
+        data = self._device_combo.currentData()
+        device_idx = data if data is not None else -1
+        self.output_device_changed.emit(device_idx)
+
     def _populate_devices(self) -> None:
+        self._device_combo.blockSignals(True)
         self._device_combo.clear()
         self._device_combo.addItem("(Default)", None)
         for dev in list_output_devices():
             self._device_combo.addItem(dev["name"], dev["index"])
+        self._device_combo.blockSignals(False)
 
     # ------------------------------------------------------------------
     # Public API

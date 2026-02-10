@@ -89,13 +89,14 @@ class MainWindow(QMainWindow):
         )
 
         # ── TTS controller ────────────────────────────────────────────
-        self._tts_ctrl = TTSController(state, parent=self)
+        self._tts_ctrl = TTSController(state, latency=self._latency, parent=self)
 
         # Connect TTS tab signals → controller
         tts_tab = self.section_b.tts_tab
         tts_tab.start_server_requested.connect(self._tts_ctrl.start_server)
         tts_tab.stop_server_requested.connect(self._tts_ctrl.stop_server)
         tts_tab.reference_changed.connect(self._tts_ctrl.set_reference_audio)
+        tts_tab.output_device_changed.connect(self._tts_ctrl.set_output_device)
 
         # Connect latency tracker → Section A display
         self._latency.stats_updated.connect(self._on_latency_stats)

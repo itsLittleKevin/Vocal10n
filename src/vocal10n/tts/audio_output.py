@@ -82,9 +82,11 @@ class AudioPlayer:
             return False
 
         try:
+            logger.debug("Playing audio: shape=%s, sr=%d, device=%s", samples.shape, sample_rate, self.device_index)
             sd.play(samples, samplerate=sample_rate, device=self.device_index)
             if blocking:
                 sd.wait()
+            logger.info("Audio playback started successfully")
             return True
         except sd.PortAudioError as e:
             logger.error("Audio playback failed: %s", e)

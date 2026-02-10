@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, Slot
 from vocal10n.config import get_config
 from vocal10n.constants import EventType, ModelStatus
 from vocal10n.pipeline.events import TranslationEvent, get_dispatcher
+from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
 from vocal10n.tts.audio_output import AudioPlayer
 from vocal10n.tts.client import GPTSoVITSClient, TTSConfig
@@ -32,10 +33,11 @@ _DEFAULT_REF_TEXT = "I'm really sorry you were put on hold, but unfortunately we
 class TTSController(QObject):
     """Manages TTS lifecycle: server start/stop, synthesis queue, and playback."""
 
-    def __init__(self, state: SystemState, parent: Optional[QObject] = None):
+    def __init__(self, state: SystemState, latency: Optional[LatencyTracker] = None, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._state = state
         self._cfg = get_config()
+        self._latency = latency
 
         # TTS components (lazy init)
         self._server: Optional[GPTSoVITSServer] = None
@@ -174,8 +176,12 @@ class TTSController(QObject):
         """Handle translation event — speak the translated text."""
         if not event.translated_text:
             return
+        logger.debug("Translation event received: tts_target_enabled=%s, status=%s",
+                     self._state.tts_target_enabled, self._state.tts_status)
         if self.speak_target(event.translated_text):
-            logger.debug("Queued TTS for: %s", event.translated_text[:50])
+            logger.info("Queued TTS for: '%s'", event.translated_text[:50])
+        else:
+            logger.debug("TTS not queued (speak_target returned False)")
 
     # ------------------------------------------------------------------
     # Reference audio
@@ -219,11 +225,35 @@ class TTSController(QObject):
             temperature=self._cfg.get("tts.temperature", 1.0),
         )
 
+    @Slot(int)
+    def set_output_device(self, device_index: int) -> None:
+        """Change the audio output device."""
+        idx = device_index if device_index >= 0 else None
+        if self._player:
+            self._player.set_device(idx)
+            logger.info("Audio output device changed to: %s", idx)
+
     def _on_audio_ready(self, result: dict) -> None:
         """Called by queue worker when audio is ready."""
         audio_data = result.get("audio_data")
         if audio_data and self._player:
-            self._player.play(audio_data, blocking=False)
+            logger.info("Playing TTS audio: %d bytes, duration=%.1fms", 
+                        len(audio_data), result.get("duration_ms", 0))
+            # Record TTS latency
+            latency_ms = result.get("latency_ms", 0)
+            if self._latency and latency_ms > 0:
+                self._latency.record_tts(latency_ms)
+                # Compute total = STT + Translation + TTS
+                stt_stats = self._latency.get_stats("stt")
+                trans_stats = self._latency.get_stats("translation")
+                if stt_stats.count > 0 and trans_stats.count > 0:
+                    total = stt_stats.current_ms + trans_stats.current_ms + latency_ms
+                    self._latency.record_total(total)
+            success = self._player.play(audio_data, blocking=False)
+            if not success:
+                logger.error("Audio playback failed")
+        else:
+            logger.warning("Audio callback: no audio_data or no player")
 
     # ------------------------------------------------------------------
     # Cleanup
