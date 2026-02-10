@@ -6,6 +6,7 @@ Owns GPT-SoVITS server management and audio playback queuing.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -68,10 +69,6 @@ class TTSController(QObject):
             self._client = GPTSoVITSClient(self._build_config())
             self._client.check_health()
 
-            # Warmup TTS (first request loads models into GPU memory)
-            logger.info("Warming up TTS model...")
-            self._client.warmup()
-
             # Initialize player
             self._player = AudioPlayer()
 
@@ -83,8 +80,19 @@ class TTSController(QObject):
             dispatcher = get_dispatcher()
             dispatcher.subscribe(EventType.TRANSLATION_CONFIRMED, self._on_translation)
 
-            self._state.tts_status = ModelStatus.LOADED
-            logger.info("TTS server started successfully")
+            # Warmup TTS in background (first request loads models into GPU memory)
+            # Status stays LOADING until warmup completes
+            def do_warmup():
+                logger.info("Warming up TTS model (background)...")
+                if self._client.warmup():
+                    self._state.tts_status = ModelStatus.LOADED
+                    logger.info("TTS server ready (warmup complete)")
+                else:
+                    logger.warning("TTS warmup failed, but server is available")
+                    self._state.tts_status = ModelStatus.LOADED
+
+            threading.Thread(target=do_warmup, daemon=True).start()
+            logger.info("TTS server starting warmup...")
 
         except Exception as e:
             logger.exception("Failed to start TTS server: %s", e)
