@@ -180,23 +180,23 @@ logs/
 ## Master To-Do List
 
 ### Phase 0: Project Foundation
-- [ ] 0.1 — Initialize git repo, connect to GitHub remote
-- [ ] 0.2 — Create `.gitignore` with all exclusion patterns
-- [ ] 0.3 — Create directory skeleton (all dirs with `__init__.py` / `.gitkeep`)
-- [ ] 0.4 — Create `pyproject.toml` with project metadata
-- [ ] 0.5 — Create `config/default.yaml` (port from prebuild's `pipeline_config.yaml`)
-- [ ] 0.6 — Create `requirements/` files (derive from prebuild deps)
-- [ ] 0.7 — Write `setup_env.ps1` to create 2 venvs and install deps
-- [ ] 0.8 — Initial commit & push
+- [x] 0.1 — Initialize git repo, connect to GitHub remote
+- [x] 0.2 — Create `.gitignore` with all exclusion patterns
+- [x] 0.3 — Create directory skeleton (all dirs with `__init__.py` / `.gitkeep`)
+- [x] 0.4 — Create `pyproject.toml` with project metadata
+- [x] 0.5 — Create `config/default.yaml` (port from prebuild's `pipeline_config.yaml`)
+- [x] 0.6 — Create `requirements/` files (derive from prebuild deps)
+- [x] 0.7 — Write `setup_env.ps1` to create 2 venvs and install deps
+- [x] 0.8 — Initial commit & push
 
 ### Phase 1: Core Infrastructure
-- [ ] 1.1 — Implement `state.py` — thread-safe `SystemState` (signals for UI binding)
-- [ ] 1.2 — Implement `config.py` — YAML config loader/saver
-- [ ] 1.3 — Implement `constants.py` — enums (`EventType`, `Language`, `ModelStatus`)
-- [ ] 1.4 — Implement `pipeline/events.py` — event dispatcher (port from prebuild)
-- [ ] 1.5 — Implement `pipeline/latency.py` — latency tracker (port from prebuild)
-- [ ] 1.6 — Implement `utils/gpu.py` — GPU/VRAM monitoring
-- [ ] 1.7 — Implement `utils/logger.py` — logging config
+- [x] 1.1 — Implement `constants.py` — enums (`EventType`, `Language`, `ModelStatus`, `TTSSource`)
+- [x] 1.2 — Implement `config.py` — YAML config loader/saver (dot-key access, thread-safe)
+- [x] 1.3 — Implement `state.py` — thread-safe `SystemState` (Qt signals for UI binding)
+- [x] 1.4 — Implement `pipeline/events.py` — event dispatcher (port from prebuild, sync-only)
+- [x] 1.5 — Implement `pipeline/latency.py` — latency tracker (Qt signal on update)
+- [x] 1.6 — Implement `utils/gpu.py` — GPU/VRAM monitoring (pynvml)
+- [x] 1.7 — Implement `utils/logger.py` — logging config
 
 ### Phase 2: PySide6 UI Shell
 - [ ] 2.1 — `app.py` — QApplication entry, theme loading
