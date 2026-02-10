@@ -20,6 +20,7 @@ import time
 
 from vocal10n.config import get_config
 from vocal10n.constants import EventType
+from vocal10n.llm.corrector import Corrector
 from vocal10n.llm.engine import LLMEngine
 from vocal10n.pipeline.events import EventDispatcher, TextEvent
 from vocal10n.pipeline.latency import LatencyTracker
@@ -47,6 +48,10 @@ class LLMTranslator:
         cfg = get_config()
         self._target_lang: str = cfg.get("translation.target_language", "English")
 
+        # Corrector — glossary-based STT correction hints
+        self._corrector = Corrector()
+        self._load_glossaries()
+
         # Debouncing for pending text
         self._pending_timer: threading.Timer | None = None
         self._pending_text: str = ""
@@ -57,11 +62,16 @@ class LLMTranslator:
         self._confirmed_timer: threading.Timer | None = None
         self._batch_delay_s: float = cfg.get("pipeline.confirmed_batch_delay_ms", 800) / 1000
         self._buffer_start_t: float | None = None
-        self._max_buffer_age: float = 1.2
+        self._max_buffer_age: float = cfg.get("pipeline.max_buffer_age_s", 2.0)
+        self._min_clause_chars: int = cfg.get("pipeline.min_clause_chars", 8)
 
         # Dedup
         self._last_confirmed_src: str = ""
         self._last_pending_src: str = ""
+
+        # Context window — last N confirmed translations for coherence
+        self._context_window: list[str] = []
+        self._context_window_size: int = cfg.get("translation.context_window_size", 2)
 
         # Accumulated translation text
         self._accumulated: list[str] = []
@@ -100,7 +110,18 @@ class LLMTranslator:
                 self._pending_timer = None
             self._last_confirmed_src = ""
             self._last_pending_src = ""
+            self._context_window.clear()
             self._accumulated.clear()
+
+    def _load_glossaries(self) -> None:
+        """Load glossary files from knowledge_base/ directory."""
+        from pathlib import Path
+        project_root = Path(__file__).resolve().parents[3]
+        kb_dir = project_root / "knowledge_base"
+        if kb_dir.is_dir():
+            count = self._corrector.load_glossary_dir(kb_dir)
+            if count:
+                logger.info("Corrector loaded %d glossary terms", count)
 
     # ------------------------------------------------------------------
     # Event handlers — called by dispatcher in arbitrary threads
@@ -124,7 +145,7 @@ class LLMTranslator:
                 return
 
             # 2) Clause punctuation + enough content → early cut
-            if self._is_clause_end(text) and self._char_count(combined) >= 5:
+            if self._is_clause_end(text) and self._char_count(combined) >= self._min_clause_chars:
                 self._flush_and_translate(combined, "clause")
                 return
 
@@ -216,7 +237,18 @@ class LLMTranslator:
 
         try:
             t0 = time.perf_counter()
-            translation = self._engine.translate(cleaned, self._target_lang)
+            # Build context from recent confirmed translations
+            context = ""
+            if not is_pending and self._context_window:
+                context = " ".join(self._context_window[-self._context_window_size:])
+
+            # Build glossary hint for domain-specific terms
+            glossary_hint = self._corrector.build_glossary_hint(cleaned)
+            if glossary_hint:
+                context = f"{glossary_hint}\n{context}" if context else glossary_hint
+
+            translation = self._engine.translate(cleaned, self._target_lang,
+                                                 context=context)
             dt_ms = (time.perf_counter() - t0) * 1000
 
             if not translation:
@@ -228,6 +260,10 @@ class LLMTranslator:
             else:
                 self._last_confirmed_src = cleaned
                 self._accumulated.append(translation)
+                self._context_window.append(translation)
+                # Keep context window bounded
+                if len(self._context_window) > self._context_window_size * 2:
+                    self._context_window = self._context_window[-self._context_window_size:]
                 self._latency.record_translation(dt_ms)
 
             # Publish event

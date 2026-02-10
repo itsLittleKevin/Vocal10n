@@ -106,7 +106,8 @@ class LLMApiBackend:
     # Translation (same interface as LLMEngine)
     # ------------------------------------------------------------------
 
-    def translate(self, text: str, target_language: str) -> str:
+    def translate(self, text: str, target_language: str,
+                  context: str = "") -> str:
         """Translate *text* to *target_language* via API.
 
         Raises ``RuntimeError`` if not connected.
@@ -128,6 +129,10 @@ class LLMApiBackend:
             text=text,
             source_lang=source_lang,
         )
+
+        # Add context for coherence
+        if context:
+            user_content = f"{context}\n{user_content}"
 
         system_msg = (
             "You are a professional translator. "

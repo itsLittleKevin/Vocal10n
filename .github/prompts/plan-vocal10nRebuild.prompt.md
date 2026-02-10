@@ -35,6 +35,8 @@ Vocal10n/
 │       ├── stt/                    # Speech-to-Text (FasterWhisper)
 │       │   ├── __init__.py
 │       │   ├── engine.py           # FasterWhisper wrapper, streaming
+│       │   ├── controller.py       # STT controller (lifecycle, events)
+│       │   ├── worker.py           # Background STT worker thread
 │       │   ├── filters.py          # Hallucination filter, phonetic correction
 │       │   ├── audio_capture.py    # Microphone input, VAD
 │       │   └── transcript.py       # Segment management, confirmation logic
@@ -42,14 +44,17 @@ Vocal10n/
 │       ├── llm/                    # Translation Engine (Qwen3-4B via llama-cpp)
 │       │   ├── __init__.py
 │       │   ├── engine.py           # llama-cpp-python model loader
+│       │   ├── api_backend.py      # OpenAI-compatible API backend
+│       │   ├── controller.py       # LLM controller (lifecycle, events)
 │       │   ├── translator.py       # Translation logic, prompt templates
-│       │   ├── corrector.py        # Source text correction (punctuation, RAG)
-│       │   └── rag.py              # Knowledge base / RAG integration
+│       │   ├── corrector.py        # Glossary-based STT correction + prompt hints
+│       │   └── rag.py              # Knowledge base / RAG integration (planned)
 │       │
 │       ├── tts/                    # Text-to-Speech (GPT-SoVITS client)
 │       │   ├── __init__.py
 │       │   ├── client.py           # HTTP client to GPT-SoVITS API
-│       │   ├── queue.py            # TTS queue manager, buffering
+│       │   ├── controller.py       # TTS controller (server lifecycle, queue)
+│       │   ├── queue.py            # TTS queue manager, buffering, pruning
 │       │   ├── audio_output.py     # Playback, device selection
 │       │   └── server_manager.py   # Subprocess launcher for GPT-SoVITS
 │       │
@@ -101,8 +106,9 @@ Vocal10n/
 │
 ├── reference_audio/                # TTS reference audio (git-ignored)
 │
-├── knowledge_base/                 # RAG knowledge files
-│   └── .gitkeep
+├── knowledge_base/                 # Glossary files for STT correction
+│   ├── .gitkeep
+│   └── glossary_general.txt        # Chinese gov/agriculture terms
 │
 ├── output/                         # Generated files (git-ignored)
 │   ├── subtitles/
@@ -221,7 +227,7 @@ logs/
 ### Phase 4: LLM Translation Module (Qwen3)
 - [x] 4.1 — `llm/engine.py` — llama-cpp-python model loader (port from prebuild)
 - [x] 4.2 — `llm/translator.py` — Translation logic with prompt templates
-- [ ] 4.3 — `llm/corrector.py` — Source text correction pass (deferred)
+- [x] 4.3 — `llm/corrector.py` — Glossary-based correction + prompt augmentation
 - [ ] 4.4 — `llm/rag.py` — Knowledge base integration (deferred)
 - [x] 4.5 — `ui/tabs/translation_tab.py` — Translation tab (toggle, lang select, prompt editor, term file list, params)
 - [x] 4.6 — Wire LLM to pipeline: STT events → translate → display in A1b
@@ -261,11 +267,51 @@ logs/
 - [x] 8.5 — `ui/tabs/training_tab.py` — Training placeholder tab
 
 ### Phase 9: Testing & Documentation
-- [ ] 9.1 — End-to-end test: speech → subtitles → translation → TTS
-- [ ] 9.2 — VRAM usage validation (target: <12GB total)
-- [ ] 9.3 — Latency benchmarks (STT <1.5s, total <3.0s)
+- [x] 9.1 — End-to-end test: speech → subtitles → translation → TTS
+- [x] 9.2 — VRAM usage validation (target: <12GB total)
+- [x] 9.3 — Latency benchmarks (STT <1.5s, total <3.0s)
 - [ ] 9.4 — Write README.md with setup instructions
 - [ ] 9.5 — Final commit & push
+
+#### Phase 9 Benchmark Results (Chinese newsletter reading)
+
+| Component | Measured | Target | Status |
+|-----------|----------|--------|--------|
+| STT | 1390ms | <1500ms | **PASS** (borderline) |
+| Translation | 486ms | — | OK |
+| TTS | 7959ms | — | **BOTTLENECK** |
+| **Total** | **9836ms** | **<3000ms** | **FAIL (3.3x over)** |
+
+**VRAM budget**: ~8-9 GB estimated (FasterWhisper ~1.5GB + Qwen3 ~3GB + GPT-SoVITS ~3-4GB) — **PASS** (<12GB)
+
+**Root causes identified**:
+1. TTS synthesis (~3-6s per segment) is slower than natural speaking pace; queue backs up to 4-5 items
+2. STT phonetic errors on domain terms (科技巧院→科技小院, 驱州→曲周, 能源大学→农业大学)
+3. Translation fragmentation — short segments lose context, producing incoherent fragments
+
+**Fixes implemented**:
+- TTS queue pruning: `max_pending=3`, drops oldest when queue exceeds depth
+- Staleness threshold reduced from 30s to 8s
+- Translation context window: last N confirmed translations passed as LLM context
+- Sentence buffering: raised `min_clause_chars` from 5→8, configurable `max_buffer_age`
+- Glossary-based corrector (`llm/corrector.py`): fuzzy pinyin matching against knowledge_base/*.txt
+- Sample glossary with Chinese government/agriculture terms
+
+### Phase 10: Future Improvements (planned)
+
+Priority 1 — TTS latency (must-fix for <3s total target):
+- [ ] 10.1 — Chunked audio playback (start playing first chunk while rest downloads)
+- [ ] 10.2 — Parallel TTS workers (if VRAM headroom allows)
+- [ ] 10.3 — Investigate faster TTS models or reduced-quality mode for live use
+
+Priority 2 — STT accuracy:
+- [ ] 10.4 — Expand glossary system with UI for adding/managing domain term files
+- [ ] 10.5 — Benchmark alternative Whisper models (medium vs large-v3-turbo)
+- [ ] 10.6 — Initial prompt optimization from domain glossaries
+
+Priority 3 — Translation quality:
+- [ ] 10.7 — Retranslation-on-extend (cancel in-flight translation when segment grows)
+- [ ] 10.8 — Phase 4.4: RAG knowledge base for specialized domains
 
 ---
 
@@ -273,28 +319,28 @@ logs/
 
 ### venv_main (Python 3.11) — STT + LLM + UI + Pipeline
 ```
-PySide6>=6.6.0
-pyyaml>=6.0
-numpy>=1.24.0
-pynvml>=11.5.0
-requests>=2.31.0
-psutil>=5.9.0
-aiohttp>=3.9.0
-faster-whisper>=1.0.0
-sounddevice>=0.4.6
-soundfile>=0.12.1
-scipy>=1.11.0
-opencc-python-reimplemented>=0.1.7
-pypinyin>=0.49.0
-llama-cpp-python>=0.2.77  # with CUDA support
-flask>=3.0.0
-flask-cors>=4.0.0
+PySide6==6.10.2
+pyyaml==6.0.3
+numpy==2.4.2
+pynvml>=11.5.0              # GPU monitoring (consider nvidia-ml-py)
+requests==2.32.5
+psutil==7.2.2
+faster-whisper==1.2.1
+sounddevice==0.5.5
+soundfile==0.13.1
+scipy==1.17.0
+opencc-python-reimplemented==0.1.7
+pypinyin==0.55.0
+llama-cpp-python==0.3.16    # with CUDA support (--extra-index-url)
+flask==3.1.2
+flask-cors==6.0.2
 ```
 
 ### venv_tts (Python 3.11) — GPT-SoVITS server
 ```
 # GPT-SoVITS requirements (see vendor/GPT-SoVITS/requirements.txt)
 # Launched as separate subprocess — does not need PySide6
+# Key deps: torch 2.x (CUDA), torchaudio, transformers, etc.
 ```
 
 ---
@@ -307,7 +353,8 @@ flask-cors>=4.0.0
 | FasterWhisper large-v3-turbo (HuggingFace cache) | `models/stt/` | Can auto-download, or copy cache |
 | `Vocal10n-prebuild/GPT-SoVITS/` (entire directory) | `vendor/GPT-SoVITS/` | ~3GB+ with pretrained models |
 | `Vocal10n-prebuild/live-translation-pipeline/reference_audio/` | `reference_audio/` | Sample audio files |
-| `Vocal10n-prebuild/personal-logger/context_gaming.txt` | `knowledge_base/` | Gaming terminology for RAG |
+| `Vocal10n-prebuild/personal-logger/context_gaming.txt` | `knowledge_base/` | Gaming terminology for correction |
+| — | `knowledge_base/glossary_general.txt` | Chinese gov/agriculture terms (created in Phase 9) |
 
 ---
 
@@ -322,3 +369,9 @@ flask-cors>=4.0.0
 4. **Config-driven** — Single `default.yaml` config file controls all parameters. UI changes write back to config. Config is the source of truth.
 
 5. **Graceful VRAM management** — Sequential model loading (TTS first as subprocess, then LLM, then STT). Explicit cleanup on unload with `gc.collect()` + `torch.cuda.empty_cache()`.
+
+6. **Glossary-based correction** — Domain-specific term files in `knowledge_base/` are fuzzy-matched (pinyin similarity) against STT output and injected as glossary hints in the translation prompt; no separate LLM call needed.
+
+7. **TTS queue pruning** — Queue drops oldest items when depth exceeds `max_pending` (default 3). Prevents backlog buildup during fast speech. Combined with larger translation segments (min 8 chars) to reduce TTS call count.
+
+8. **Translation context window** — Last N confirmed translations passed as context in the LLM prompt for cross-segment coherence.

@@ -121,15 +121,21 @@ class LLMEngine:
     # Translation
     # ------------------------------------------------------------------
 
-    def translate(self, text: str, target_language: str) -> str:
+    def translate(self, text: str, target_language: str,
+                  context: str = "") -> str:
         """Translate *text* to *target_language*.  Returns translated string.
+
+        Args:
+            text: Source text to translate.
+            target_language: Target language name (e.g. "English").
+            context: Previous translation context for coherence.
 
         Raises ``RuntimeError`` if model is not loaded.
         """
         if self._model is None:
             raise RuntimeError("LLM model not loaded")
 
-        prompt = self._build_prompt(text, target_language)
+        prompt = self._build_prompt(text, target_language, context)
 
         cfg = get_config().section("translation")
 
@@ -167,7 +173,8 @@ class LLMEngine:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_prompt(text: str, target_language: str) -> str:
+    def _build_prompt(text: str, target_language: str,
+                      context: str = "") -> str:
         has_chinese = bool(re.search(r"[\u4e00-\u9fff]", text))
         source_lang = "Chinese" if has_chinese else "English"
 
@@ -181,12 +188,21 @@ class LLMEngine:
             text=text,
             source_lang=source_lang,
         )
+
+        # Add context from previous translations for coherence
+        context_block = ""
+        if context:
+            context_block = (
+                f"For context, the preceding translation was: \"{context}\"\n"
+            )
+
         # Qwen3 ChatML format (non-thinking Instruct model)
         return (
             "<|im_start|>system\n"
             "You are a professional translator. "
             "Output only the corrected translation, nothing else.<|im_end|>\n"
             "<|im_start|>user\n"
+            f"{context_block}"
             f"{user_content}<|im_end|>\n"
             "<|im_start|>assistant\n"
         )

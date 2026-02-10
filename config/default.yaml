@@ -27,6 +27,9 @@ pipeline:
   translation_debounce_ms: 150
   confirmed_batch_delay_ms: 400
   tts_queue_max_size: 10
+  tts_queue_max_pending: 3       # Drop oldest when queue exceeds this depth
+  max_buffer_age_s: 2.0          # Max seconds to buffer confirmed text before flushing
+  min_clause_chars: 8            # Min chars before clause-end triggers translation
 
 # --- STT (FasterWhisper) ---------------------------------------------------
 stt:
@@ -79,6 +82,7 @@ translation:
   target_latency_ms: 200
   target_language: "English"
   auto_detect_source: true
+  context_window_size: 2         # Number of previous translations for context
 
 # --- TTS (GPT-SoVITS) ------------------------------------------------------
 tts:

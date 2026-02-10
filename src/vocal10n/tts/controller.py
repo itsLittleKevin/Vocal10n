@@ -77,7 +77,9 @@ class TTSController(QObject):
             self._player.start()  # Start dedicated playback thread
 
             # Initialize queue
-            self._queue = TTSQueue(self._client, max_size=10)
+            max_pending = self._cfg.get("pipeline.tts_queue_max_pending", 3)
+            self._queue = TTSQueue(self._client, max_size=10,
+                                   max_pending=max_pending)
             self._queue.start(self._on_audio_ready)
 
             # Subscribe to translation events for auto-playback

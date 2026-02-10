@@ -19,9 +19,11 @@ logger = logging.getLogger(__name__)
 class TTSQueue:
     """Queue for TTS requests with background worker."""
 
-    def __init__(self, client: GPTSoVITSClient, max_size: int = 10):
+    def __init__(self, client: GPTSoVITSClient, max_size: int = 10,
+                 max_pending: int = 3):
         self.client = client
         self.max_size = max_size
+        self.max_pending = max_pending  # Drop oldest when queue exceeds this
         self._queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=max_size)
         self._worker_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
@@ -64,22 +66,31 @@ class TTSQueue:
     def enqueue(self, text: str, language: str = "en") -> bool:
         """Add text to synthesis queue.
 
+        Prunes oldest items when queue exceeds ``max_pending`` to keep
+        the pipeline responsive during fast speech.
+
         Returns:
             True if queued, False if queue full.
         """
-        if self._queue.full():
-            logger.warning("TTS queue full, dropping request")
-            return False
+        # Prune: if queue >= max_pending, drop oldest items to make room
+        while self._queue.qsize() >= self.max_pending:
+            try:
+                dropped = self._queue.get_nowait()
+                logger.info("TTS queue pruned stale item: '%s...'",
+                            dropped.get("text", "")[:30])
+            except queue.Empty:
+                break
 
         try:
             self._queue.put_nowait({
                 "text": text,
                 "language": language,
                 "timestamp": time.time(),
-                "enqueue_time": time.time(),  # Used for true text→audio latency
+                "enqueue_time": time.time(),
             })
             return True
         except queue.Full:
+            logger.warning("TTS queue full after pruning, dropping request")
             return False
 
     def clear(self) -> None:
@@ -114,12 +125,11 @@ class TTSQueue:
             except queue.Empty:
                 continue
 
-            # Catch-up is now unnecessary since playback is non-blocking.
-            # Queue max_size=10 naturally prevents unbounded growth.
-            # Drop stale requests (older than 30s) to prevent memory waste
+            # Drop stale requests (older than 8s) to prevent memory waste
             age = time.time() - request["timestamp"]
-            if age > 30.0:
-                logger.warning("Dropping stale TTS request (age %.1fs)", age)
+            if age > 8.0:
+                logger.warning("Dropping stale TTS request (age %.1fs): '%s...'",
+                               age, request["text"][:30])
                 continue
 
             logger.info("TTS processing: '%s...' (queue: %d)", request["text"][:30], self._queue.qsize())

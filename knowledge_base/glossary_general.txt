@@ -1,0 +1,36 @@
+# Vocal10n Glossary — Chinese Government & Agriculture Terms
+# Format: source_term|preferred_translation
+# Lines starting with # are comments
+#
+# Add domain-specific terms here to improve STT correction
+# and translation accuracy.
+
+# Government organizations
+教育部|Ministry of Education
+农业农村部|Ministry of Agriculture and Rural Affairs
+中国科协|China Association for Science and Technology
+教育部办公厅|General Office of the Ministry of Education
+农业农村部办公厅|General Office of the Ministry of Agriculture and Rural Affairs
+中国科协办公厅|General Office of China Association for Science and Technology
+
+# Agriculture & technology
+科技小院|Science and Technology Backyard
+中国农业大学|China Agricultural University
+质量监测|quality monitoring
+专业学位研究生|professional degree graduate students
+培养单位|cultivation units
+科技创新|scientific and technological innovation
+人才培养|talent cultivation
+
+# Places
+曲周|Quzhou
+河北|Hebei Province
+
+# Common phrases / idioms
+遍地开花|blossoming everywhere
+扬帆出海|setting sail overseas
+中央一号文件|Central Document No. 1
+零门槛|zero threshold
+零距离|zero distance
+零费用|zero cost
+零时差|zero time lag
