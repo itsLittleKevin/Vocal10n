@@ -12,7 +12,8 @@ from typing import Optional
 from PySide6.QtCore import QObject, Slot
 
 from vocal10n.config import get_config
-from vocal10n.constants import ModelStatus
+from vocal10n.constants import EventType, ModelStatus
+from vocal10n.pipeline.events import TranslationEvent, get_dispatcher
 from vocal10n.state import SystemState
 from vocal10n.tts.audio_output import AudioPlayer
 from vocal10n.tts.client import GPTSoVITSClient, TTSConfig
@@ -20,6 +21,11 @@ from vocal10n.tts.queue import TTSQueue
 from vocal10n.tts.server_manager import GPTSoVITSServer
 
 logger = logging.getLogger(__name__)
+
+# Default reference audio (relative to project root)
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_DEFAULT_REF_AUDIO = _PROJECT_ROOT / "reference_audio" / "audio_03.wav"
+_DEFAULT_REF_TEXT = "I'm really sorry you were put on hold, but unfortunately we've had heavy call volume today. But I'm back now, and I can definitely check rates and availability for you."
 
 
 class TTSController(QObject):
@@ -69,6 +75,10 @@ class TTSController(QObject):
             self._queue = TTSQueue(self._client, max_size=10)
             self._queue.start(self._on_audio_ready)
 
+            # Subscribe to translation events for auto-playback
+            dispatcher = get_dispatcher()
+            dispatcher.subscribe(EventType.TRANSLATION_CONFIRMED, self._on_translation)
+
             self._state.tts_status = ModelStatus.LOADED
             logger.info("TTS server started successfully")
 
@@ -83,6 +93,10 @@ class TTSController(QObject):
         logger.info("Stopping TTS server...")
 
         try:
+            # Unsubscribe from translation events
+            dispatcher = get_dispatcher()
+            dispatcher.unsubscribe(EventType.TRANSLATION_CONFIRMED, self._on_translation)
+
             if self._queue:
                 self._queue.stop()
                 self._queue = None
@@ -141,6 +155,17 @@ class TTSController(QObject):
         return self.synthesize(text, lang)
 
     # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+
+    def _on_translation(self, event: TranslationEvent) -> None:
+        """Handle translation event — speak the translated text."""
+        if not event.translated_text:
+            return
+        if self.speak_target(event.translated_text):
+            logger.debug("Queued TTS for: %s", event.translated_text[:50])
+
+    # ------------------------------------------------------------------
     # Reference audio
     # ------------------------------------------------------------------
 
@@ -161,11 +186,19 @@ class TTSController(QObject):
 
     def _build_config(self) -> TTSConfig:
         """Build TTSConfig from application config."""
+        # Use default reference audio if none configured
+        ref_path = self._cfg.get("tts.ref_audio_path", "")
+        ref_text = self._cfg.get("tts.ref_audio_text", "")
+        if not ref_path and _DEFAULT_REF_AUDIO.exists():
+            ref_path = str(_DEFAULT_REF_AUDIO)
+            ref_text = _DEFAULT_REF_TEXT
+            logger.info("Using default reference audio: %s", ref_path)
+
         return TTSConfig(
             api_host=self._cfg.get("tts.api_host", "127.0.0.1"),
             api_port=self._cfg.get("tts.api_port", 9880),
-            ref_audio_path=self._cfg.get("tts.ref_audio_path", ""),
-            ref_audio_text=self._cfg.get("tts.ref_audio_text", ""),
+            ref_audio_path=ref_path,
+            ref_audio_text=ref_text,
             ref_audio_lang=self._cfg.get("tts.ref_audio_lang", "en"),
             output_lang=self._cfg.get("tts.output_lang", "en"),
             speed_factor=self._cfg.get("tts.speed_factor", 1.0),
