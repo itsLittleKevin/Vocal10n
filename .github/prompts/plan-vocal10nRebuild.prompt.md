@@ -4,7 +4,7 @@
 
 | Decision | Choice |
 |----------|--------|
-| **Venvs** | 3 separate: STT (Python 3.11), LLM (Python 3.11), TTS (Python 3.10) |
+| **Venvs** | 2 separate: Main/STT+LLM+UI (Python 3.11), TTS (Python 3.11) |
 | **UI Framework** | PySide6 (Qt6, LGPL) |
 | **Directory Layout** | `src/vocal10n/` Python package with submodules |
 | **TTS Architecture** | GPT-SoVITS as separate subprocess, HTTP API on port 9880 |
@@ -115,14 +115,11 @@ Vocal10n/
 │   └── GPT-SoVITS/                 # Embedded GPT-SoVITS (git-ignored)
 │
 ├── venvs/                          # Virtual environments (git-ignored)
-│   ├── venv_stt/                   # Python 3.11 — FasterWhisper
-│   ├── venv_llm/                   # Python 3.11 — llama-cpp-python
-│   └── venv_tts/                   # Python 3.10 — GPT-SoVITS
+│   ├── venv_main/                  # Python 3.11 — STT + LLM + UI + Pipeline
+│   └── venv_tts/                   # Python 3.11 — GPT-SoVITS server
 │
-├── requirements/                   # Per-component requirements
-│   ├── requirements-core.txt       # Shared: PySide6, pyyaml, pynvml, etc.
-│   ├── requirements-stt.txt        # faster-whisper, sounddevice, pypinyin, etc.
-│   ├── requirements-llm.txt        # llama-cpp-python[server], etc.
+├── requirements/                   # Per-venv requirements
+│   ├── requirements-main.txt       # STT + LLM + UI + Pipeline deps
 │   └── requirements-tts.txt        # GPT-SoVITS deps (for reference)
 │
 └── Vocal10n-prebuild/              # Legacy prebuild (git-ignored, local only)
@@ -189,7 +186,7 @@ logs/
 - [ ] 0.4 — Create `pyproject.toml` with project metadata
 - [ ] 0.5 — Create `config/default.yaml` (port from prebuild's `pipeline_config.yaml`)
 - [ ] 0.6 — Create `requirements/` files (derive from prebuild deps)
-- [ ] 0.7 — Write `setup_env.ps1` to create 3 venvs and install deps
+- [ ] 0.7 — Write `setup_env.ps1` to create 2 venvs and install deps
 - [ ] 0.8 — Initial commit & push
 
 ### Phase 1: Core Infrastructure
@@ -271,38 +268,31 @@ logs/
 
 ## Component Dependencies (per venv)
 
-### venv_stt (Python 3.11)
+### venv_main (Python 3.11) — STT + LLM + UI + Pipeline
 ```
+PySide6>=6.6.0
+pyyaml>=6.0
+numpy>=1.24.0
+pynvml>=11.5.0
+requests>=2.31.0
+psutil>=5.9.0
+aiohttp>=3.9.0
 faster-whisper>=1.0.0
-sounddevice
-numpy
-scipy
-opencc-python-reimplemented
-pypinyin
-pynvml
-pyyaml
-PySide6
-flask
-flask-cors
+sounddevice>=0.4.6
+soundfile>=0.12.1
+scipy>=1.11.0
+opencc-python-reimplemented>=0.1.7
+pypinyin>=0.49.0
+llama-cpp-python>=0.2.77  # with CUDA support
+flask>=3.0.0
+flask-cors>=4.0.0
 ```
 
-### venv_llm (Python 3.11)
-```
-llama-cpp-python  # with CUDA support
-pynvml
-psutil
-pyyaml
-numpy
-PySide6
-```
-
-### venv_tts (Python 3.10)
+### venv_tts (Python 3.11) — GPT-SoVITS server
 ```
 # GPT-SoVITS requirements (see vendor/GPT-SoVITS/requirements.txt)
 # Launched as separate subprocess — does not need PySide6
 ```
-
-> **Note:** Since PySide6 is in both STT and LLM venvs, and the main app needs all components, the UI process will run under one primary venv (likely venv_stt or a combined core venv). The LLM engine can be loaded in-process since both use Python 3.11. In practice, we should consider merging venv_stt + venv_llm into one since they share the same Python version — the 3-venv split is mainly for isolation. If any dependency conflict arises, the split is already in place.
 
 ---
 

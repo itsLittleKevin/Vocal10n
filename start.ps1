@@ -9,11 +9,11 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 
 # ── Validate venvs exist ──────────────────────────────────────────────────
-$venvSTT = Join-Path $ProjectRoot "venvs\venv_stt\Scripts\python.exe"
+$venvMain = Join-Path $ProjectRoot "venvs\venv_main\Scripts\python.exe"
 $venvTTS = Join-Path $ProjectRoot "venvs\venv_tts\Scripts\python.exe"
 
-if (-not (Test-Path $venvSTT)) {
-    Write-Host "ERROR: venv_stt not found. Run setup_env.ps1 first." -ForegroundColor Red
+if (-not (Test-Path $venvMain)) {
+    Write-Host "ERROR: venv_main not found. Run setup_env.ps1 first." -ForegroundColor Red
     exit 1
 }
 
@@ -34,4 +34,4 @@ if ((Test-Path $venvTTS) -and (Test-Path $sovitsApi)) {
 
 # ── Start main application ────────────────────────────────────────────────
 Write-Host "Starting Vocal10n..." -ForegroundColor Cyan
-& $venvSTT -m vocal10n.app
+& $venvMain -m vocal10n.app
