@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
+from vocal10n.stt.controller import STTController
 from vocal10n.ui.section_a import SectionA
 from vocal10n.ui.section_b import SectionB
 from vocal10n.utils.gpu import get_gpu_monitor
@@ -42,7 +44,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Vertical)
 
         self.section_a = SectionA()
-        self.section_b = SectionB()
+        self.section_b = SectionB(state)
 
         splitter.addWidget(self.section_a)
         splitter.addWidget(self.section_b)
@@ -59,6 +61,18 @@ class MainWindow(QMainWindow):
         for w in (self._sb_gpu, self._sb_vram, self._sb_latency):
             sb.addPermanentWidget(w)
         self.setStatusBar(sb)
+
+        # ── STT controller ────────────────────────────────────────────
+        self._latency = LatencyTracker()
+        self._stt_ctrl = STTController(state, self._latency, parent=self)
+
+        # Connect STT tab load/unload → controller
+        stt_tab = self.section_b.stt_tab
+        stt_tab._model_sel.load_requested.connect(self._stt_ctrl.load_model)
+        stt_tab._model_sel.unload_requested.connect(self._stt_ctrl.unload_model)
+
+        # Connect latency tracker → Section A display
+        self._latency.stats_updated.connect(self._on_latency_stats)
 
         # ── Wire state signals → UI ──────────────────────────────────
         self._connect_state()
@@ -99,3 +113,24 @@ class MainWindow(QMainWindow):
             self.section_a.update_gpu(
                 info.name, info.vram_used_mb, info.vram_total_mb, info.gpu_util_pct,
             )
+
+    # ------------------------------------------------------------------
+    # Latency display
+    # ------------------------------------------------------------------
+
+    def _on_latency_stats(self) -> None:
+        stats = self._latency.get_all_stats()
+        for component in ("stt", "translation", "tts", "total"):
+            s = stats.get(component)
+            if s and s.count > 0:
+                self.section_a.update_latency(component, s.current_ms, s.avg_5s_ms)
+                if component == "total":
+                    self._sb_latency.setText(f"Latency: {s.current_ms:.0f} ms")
+
+    # ------------------------------------------------------------------
+    # Shutdown
+    # ------------------------------------------------------------------
+
+    def closeEvent(self, event) -> None:
+        self._stt_ctrl.shutdown()
+        super().closeEvent(event)

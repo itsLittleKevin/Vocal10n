@@ -1,10 +1,13 @@
 """Section B — bottom portion of the main window.
 
 A QTabWidget that will host settings tabs for each pipeline component.
-Phase 2 creates placeholder widgets; real tabs arrive in later phases.
+Placeholder widgets are replaced as each phase is implemented.
 """
 
 from PySide6.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
+
+from vocal10n.state import SystemState
+from vocal10n.ui.tabs.stt_tab import STTTab
 
 
 def _placeholder(text: str) -> QWidget:
@@ -22,11 +25,14 @@ class SectionB(QTabWidget):
     """Bottom tab container.  Placeholder tabs are swapped out as each
     phase implements real content."""
 
-    def __init__(self, parent=None):
+    def __init__(self, state: SystemState, parent=None):
         super().__init__(parent)
 
-        # Placeholders — will be replaced in Phases 3-8
-        self.addTab(_placeholder("STT settings will appear here (Phase 3)"), "STT")
+        # Phase 3: real STT tab
+        self.stt_tab = STTTab(state)
+        self.addTab(self.stt_tab, "STT")
+
+        # Placeholders — will be replaced in Phases 4-8
         self.addTab(
             _placeholder("Translation settings will appear here (Phase 4)"),
             "Translation",

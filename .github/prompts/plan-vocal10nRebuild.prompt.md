@@ -210,13 +210,13 @@ logs/
 - [x] 2.9 — Verify UI shell launches and looks correct
 
 ### Phase 3: STT Module (FasterWhisper)
-- [ ] 3.1 — `stt/audio_capture.py` — Microphone capture with device selection
-- [ ] 3.2 — `stt/engine.py` — FasterWhisper model loader/unloader with VRAM cleanup
-- [ ] 3.3 — `stt/transcript.py` — Segment management (pending/confirmed)
-- [ ] 3.4 — `stt/filters.py` — Hallucination filter + phonetic correction (port from prebuild)
-- [ ] 3.5 — `ui/tabs/stt_tab.py` — STT settings tab (toggle, model select, language, params)
-- [ ] 3.6 — Wire STT to pipeline events and UI streaming display
-- [ ] 3.7 — Test: mic → text appearing in A1a with latency metric
+- [x] 3.1 — `stt/audio_capture.py` — Microphone capture with device selection
+- [x] 3.2 — `stt/engine.py` — FasterWhisper model loader/unloader with VRAM cleanup
+- [x] 3.3 — `stt/transcript.py` — Segment management (pending/confirmed)
+- [x] 3.4 — `stt/filters.py` — Hallucination filter + phonetic correction (port from prebuild)
+- [x] 3.5 — `ui/tabs/stt_tab.py` — STT settings tab (toggle, model select, language, params)
+- [x] 3.6 — Wire STT to pipeline events and UI streaming display
+- [x] 3.7 — Test: mic → text appearing in A1a with latency metric
 
 ### Phase 4: LLM Translation Module (Qwen3)
 - [ ] 4.1 — `llm/engine.py` — llama-cpp-python model loader (port from prebuild)
