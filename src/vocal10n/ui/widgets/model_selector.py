@@ -75,12 +75,14 @@ class ModelSelector(QWidget):
 
         self._load_btn = QPushButton("Load")
         self._load_btn.setProperty("accent", True)
-        self._load_btn.setFixedWidth(64)
+        self._load_btn.setMinimumWidth(70)
+        self._load_btn.setFixedHeight(24)
         self._load_btn.clicked.connect(self._on_load)
         row.addWidget(self._load_btn)
 
         self._unload_btn = QPushButton("Unload")
-        self._unload_btn.setFixedWidth(64)
+        self._unload_btn.setMinimumWidth(70)
+        self._unload_btn.setFixedHeight(24)
         self._unload_btn.setEnabled(False)
         self._unload_btn.clicked.connect(self._on_unload)
         row.addWidget(self._unload_btn)
