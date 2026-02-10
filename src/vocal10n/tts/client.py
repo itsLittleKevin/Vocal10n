@@ -139,6 +139,8 @@ class GPTSoVITSClient:
         start_time = time.time()
 
         payload = self._build_payload(text, text_lang, streaming)
+        logger.debug("TTS payload: ref=%s, text_lang=%s, prompt_lang=%s",
+                     payload.get("ref_audio_path"), text_lang, payload.get("prompt_lang"))
 
         try:
             resp = requests.post(
@@ -169,10 +171,17 @@ class GPTSoVITSClient:
 
     def _build_payload(self, text: str, text_lang: str, streaming: bool) -> dict[str, Any]:
         cfg = self.config
+        # Ensure ref_audio_path is absolute
+        ref_path = cfg.ref_audio_path
+        if ref_path and not Path(ref_path).is_absolute():
+            # Resolve relative to project root
+            project_root = Path(__file__).resolve().parents[3]
+            ref_path = str(project_root / ref_path)
+
         return {
             "text": text,
             "text_lang": text_lang.lower(),
-            "ref_audio_path": cfg.ref_audio_path,
+            "ref_audio_path": ref_path,
             "prompt_text": cfg.ref_audio_text,
             "prompt_lang": cfg.ref_audio_lang.lower(),
             "top_k": cfg.top_k,
@@ -215,7 +224,11 @@ class GPTSoVITSClient:
 
     def _handle_error_response(self, resp: requests.Response) -> dict[str, Any]:
         try:
-            error_msg = resp.json().get("message", "Unknown error")
+            data = resp.json()
+            error_msg = data.get("message", "Unknown error")
+            exception = data.get("Exception", "")
+            if exception:
+                error_msg = f"{error_msg}: {exception}"
         except Exception:
             error_msg = resp.text[:200]
         self._last_error = error_msg
