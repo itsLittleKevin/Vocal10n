@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QScrollArea, QTabWidget, QVBoxLayout, QWidget
 
 from vocal10n.state import SystemState
+from vocal10n.ui.tabs.kb_tab import KnowledgeBaseTab
 from vocal10n.ui.tabs.obs_tab import OBSTab
 from vocal10n.ui.tabs.output_tab import OutputTab
 from vocal10n.ui.tabs.stt_tab import STTTab
@@ -64,6 +65,10 @@ class SectionB(QTabWidget):
         self.obs_tab = OBSTab(state)
         self.addTab(_scrollable(self.obs_tab), "OBS")
 
-        # Phase 8: training placeholder tab
+        # Knowledge Base tab (glossary management + RAG)
+        self.kb_tab = KnowledgeBaseTab(state)
+        self.addTab(_scrollable(self.kb_tab), "Knowledge Base")
+
+        # Phase 8: training tab
         self.training_tab = TrainingTab(state)
         self.addTab(_scrollable(self.training_tab), "Training")

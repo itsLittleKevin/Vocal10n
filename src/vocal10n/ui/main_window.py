@@ -75,7 +75,10 @@ class MainWindow(QMainWindow):
         stt_tab = self.section_b.stt_tab
         stt_tab._model_sel.load_requested.connect(self._stt_ctrl.load_model)
         stt_tab._model_sel.unload_requested.connect(self._stt_ctrl.unload_model)
-        stt_tab.term_files_changed.connect(self._stt_ctrl.update_term_files)
+
+        # KB tab term files → STT controller
+        kb_tab = self.section_b.kb_tab
+        kb_tab.term_files_changed.connect(self._stt_ctrl.update_term_files)
         # ── LLM controller ────────────────────────────────────────────
         self._llm_ctrl = LLMController(state, self._latency, parent=self)
 

@@ -18,7 +18,6 @@ from vocal10n.state import SystemState
 from vocal10n.ui.utils.combobox_styling import ArrowComboBox
 from vocal10n.ui.widgets.model_selector import ModelSelector
 from vocal10n.ui.widgets.param_slider import ParamSlider
-from vocal10n.ui.widgets.term_file_list import TermFileList
 
 
 class STTTab(QWidget):
@@ -120,54 +119,18 @@ class STTTab(QWidget):
 
         root.addWidget(tune_box)
 
-        # ── Term files (phonetic correction + initial_prompt) ─────────
-        terms_box = QGroupBox("Recognition Context (Term Files)")
-        terms_lay = QVBoxLayout(terms_box)
-        terms_lay.setSpacing(4)
-
-        terms_info = QLabel(
-            "Add term files to improve recognition accuracy. Terms are used for:\n"
-            "• Phonetic correction (fuzzy pinyin matching)\n"
-            "• Whisper initial_prompt context (helps Whisper prefer these terms)\n"
-            "Format: one term per line, plain text, UTF-8."
+        # ── Recognition context note ─────────────────────────────────
+        ctx_note = QLabel(
+            "<b>Recognition Context:</b> Term files for phonetic correction "
+            "and Whisper initial_prompt are managed in the "
+            "<b>Knowledge Base</b> tab."
         )
-        terms_info.setWordWrap(True)
-        terms_info.setProperty("dim", True)
-        terms_lay.addWidget(terms_info)
-
-        self._term_list = TermFileList(title="Loaded Term Files")
-        self._term_list.files_changed.connect(self._on_term_files_changed)
-        terms_lay.addWidget(self._term_list)
-
-        # Pre-load existing term files from config
-        _project_root = Path(__file__).resolve().parents[4]
-        for default_file in ("config/context_gaming.txt",):
-            fp = _project_root / default_file
-            if fp.exists():
-                self._term_list.add_file(str(fp))
-
-        # ── Capacity + status row ──────────────────────────────────
-        cap_row = QHBoxLayout()
-        self._capacity_slider = ParamSlider(
-            "Initial Prompt Capacity",
-            minimum=50, maximum=500,
-            default=self._cfg.get("stt.initial_prompt_capacity", 200),
-            step=25,
-            tooltip="Max number of terms to include in Whisper's initial_prompt.\n"
-                    "Larger = better recognition for all terms, but higher latency.",
+        ctx_note.setWordWrap(True)
+        ctx_note.setStyleSheet(
+            "color: #8892a4; font-size: 12px; padding: 8px; "
+            "border: 1px solid #3a3f4b; border-radius: 4px; margin-top: 4px;"
         )
-        self._capacity_slider.value_changed.connect(
-            lambda v: self._cfg.set("stt.initial_prompt_capacity", int(v))
-        )
-        cap_row.addWidget(self._capacity_slider)
-
-        self._term_status = QLabel("Loaded: 0 terms")
-        self._term_status.setMinimumWidth(120)
-        self._term_status.setProperty("dim", True)
-        cap_row.addWidget(self._term_status)
-        terms_lay.addLayout(cap_row)
-
-        root.addWidget(terms_box)
+        root.addWidget(ctx_note)
 
         # ── Info ──────────────────────────────────────────────────────
         info = QLabel(
@@ -199,20 +162,3 @@ class STTTab(QWidget):
             self._state.source_language = Language(code)
         except ValueError:
             pass
-
-    @Slot(list)
-    def _on_term_files_changed(self, paths: list[str]) -> None:
-        # Count total terms from all files
-        total_terms = 0
-        for p in paths:
-            try:
-                pp = Path(p)
-                if pp.exists():
-                    total_terms += sum(1 for line in pp.read_text(encoding="utf-8").splitlines() if line.strip())
-            except Exception:
-                pass
-        # Update status label (if it exists)
-        if hasattr(self, '_term_status'):
-            self._term_status.setText(f"Loaded: {total_terms} terms")
-        # Emit signal
-        self.term_files_changed.emit(paths)

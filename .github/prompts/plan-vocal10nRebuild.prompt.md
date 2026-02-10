@@ -77,7 +77,7 @@ Vocal10n/
 │       │   │   ├── tts_tab.py      # TTS/VITS settings tab
 │       │   │   ├── output_tab.py   # Output settings tab
 │       │   │   ├── obs_tab.py      # OBS subtitle styling tab
-│       │   │   └── training_tab.py # Training placeholder tab
+│       │   │   └── training_tab.py # STT fine-tuning (SRT + WAV → LoRA → CT2)
 │       │   ├── widgets/            # Reusable custom widgets
 │       │   │   ├── __init__.py
 │       │   │   ├── param_slider.py # Parameter slider with info tooltip
@@ -264,7 +264,7 @@ logs/
 - [x] 8.2 — A2 section: live GPU metrics, latency display, module status indicators
 - [x] 8.3 — Error handling and graceful shutdown
 - [x] 8.4 — Manual A1a input mode (standalone translator when STT is off)
-- [x] 8.5 — `ui/tabs/training_tab.py` — Training placeholder tab
+- [x] 8.5 — `ui/tabs/training_tab.py` — STT fine-tuning tab (SRT-based LoRA → CTranslate2)
 
 ### Phase 9: Testing & Documentation
 - [x] 9.1 — End-to-end test: speech → subtitles → translation → TTS
@@ -312,6 +312,8 @@ Priority 2 — STT accuracy:
 Priority 3 — Translation quality:
 - [ ] 10.7 — Retranslation-on-extend (cancel in-flight translation when segment grows)
 - [x] 10.8 — Phase 4.4: RAG vector retrieval for large glossaries (implemented)
+- [x] 10.9 — KB tab consolidation: Recognition Context moved from STT tab to KB tab
+- [x] 10.10 — Training tab: full SRT-based Whisper LoRA fine-tuning workflow
 
 ---
 
@@ -379,3 +381,5 @@ flask-cors==6.0.2
 8. **Translation context window** — Last N confirmed translations passed as context in the LLM prompt for cross-segment coherence.
 
 9. **RAG vector retrieval** — When glossary exceeds `rag_threshold` (default 100 terms), `Corrector` auto-switches from O(n) pinyin scan to FAISS vector search via `RAGIndex`. Uses `all-MiniLM-L6-v2` embedding model on CPU (~80 MB, no VRAM cost). Index is cached to `knowledge_base/*.faiss`/`*.npy` for fast reload. Gracefully degrades to pinyin scan if deps not installed.
+
+10. **SRT-based STT fine-tuning** — Training tab implements a 4-step workflow: (1) import WAV + SRT pair, (2) auto-slice audio using SRT timestamps via ffmpeg (16kHz mono), (3) LoRA fine-tune `whisper-large-v3-turbo` with configurable epochs/batch/rank/LR, (4) convert merged model to CTranslate2 `int8_float16` for faster-whisper. Minimum 5 segments required. Training runs in background thread with real-time log output.
