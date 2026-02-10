@@ -6,6 +6,7 @@ Launches the GPT-SoVITS API server as a separate process using venv_tts.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -17,7 +18,9 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Default paths (relative to project root)
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+# server_manager.py is at src/vocal10n/tts/server_manager.py
+# parents[0]=tts, [1]=vocal10n, [2]=src, [3]=project_root (Vocal10n)
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _VENDOR_SOVITS = _PROJECT_ROOT / "vendor" / "GPT-SoVITS"
 _VENV_TTS = _PROJECT_ROOT / "venvs" / "venv_tts"
 
@@ -87,11 +90,20 @@ class GPTSoVITSServer:
         ]
 
         logger.info("Starting GPT-SoVITS server: %s", " ".join(cmd))
+        logger.info("Working directory: %s", self.sovits_path)
+
+        # GPT-SoVITS needs both directories in PYTHONPATH:
+        # - Root for tools/, GPT_SoVITS/ imports
+        # - GPT_SoVITS/ subdir for AR/, BigVGAN/, module/, etc.
+        env = dict(os.environ)
+        gpt_sovits_subdir = self.sovits_path / "GPT_SoVITS"
+        env["PYTHONPATH"] = f"{self.sovits_path};{gpt_sovits_subdir}"
 
         try:
             self._process = subprocess.Popen(
                 cmd,
                 cwd=str(self.sovits_path),
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
