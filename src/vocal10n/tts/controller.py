@@ -74,6 +74,7 @@ class TTSController(QObject):
 
             # Initialize player with any device the user already selected
             self._player = AudioPlayer(device_index=self._pending_device)
+            self._player.start()  # Start dedicated playback thread
 
             # Initialize queue
             self._queue = TTSQueue(self._client, max_size=10)
@@ -240,14 +241,16 @@ class TTSController(QObject):
         if result.get("streaming") and self._player:
             generator = result.get("audio_generator")
             if generator:
-                logger.info("Starting streaming TTS playback")
+                # 2-tier pipeline: blocks during chunk accumulation (synthesis),
+                # then enqueues audio for the dedicated playback thread and
+                # returns immediately so the queue worker can synthesise the
+                # next item while current audio plays.
                 request_start = result.get("request_start")
-                play_result = self._player.play_stream(generator, request_start=request_start)
-                ttfa_ms = play_result.get("ttfa_ms")
-                if ttfa_ms is not None:
-                    self._record_tts_latency(ttfa_ms)
-                if not play_result.get("success"):
-                    logger.error("Streaming audio playback failed")
+                self._player.play_stream(
+                    generator,
+                    request_start=request_start,
+                    on_ttfa=self._record_tts_latency,
+                )
             else:
                 logger.warning("Streaming result but no audio_generator")
         else:

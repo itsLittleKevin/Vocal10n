@@ -57,7 +57,7 @@ class LLMTranslator:
         self._confirmed_timer: threading.Timer | None = None
         self._batch_delay_s: float = cfg.get("pipeline.confirmed_batch_delay_ms", 800) / 1000
         self._buffer_start_t: float | None = None
-        self._max_buffer_age: float = 2.0
+        self._max_buffer_age: float = 1.2
 
         # Dedup
         self._last_confirmed_src: str = ""
@@ -124,7 +124,7 @@ class LLMTranslator:
                 return
 
             # 2) Clause punctuation + enough content → early cut
-            if self._is_clause_end(text) and self._char_count(combined) >= 8:
+            if self._is_clause_end(text) and self._char_count(combined) >= 5:
                 self._flush_and_translate(combined, "clause")
                 return
 

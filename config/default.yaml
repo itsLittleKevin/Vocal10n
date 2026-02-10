@@ -25,7 +25,7 @@ pipeline:
 
   # Batching / debounce
   translation_debounce_ms: 150
-  confirmed_batch_delay_ms: 800
+  confirmed_batch_delay_ms: 400
   tts_queue_max_size: 10
 
 # --- STT (FasterWhisper) ---------------------------------------------------

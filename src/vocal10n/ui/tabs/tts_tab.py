@@ -96,6 +96,7 @@ class TTSTab(QWidget):
         dev_lay = QHBoxLayout(dev_box)
         dev_lay.addWidget(QLabel("Device:"))
         self._device_combo = ArrowComboBox()
+        self._device_combo.setMinimumWidth(300)  # Wider to show full names
         self._populate_devices()
         self._device_combo.currentIndexChanged.connect(self._on_device_changed)
         dev_lay.addWidget(self._device_combo, stretch=1)
@@ -258,6 +259,9 @@ class TTSTab(QWidget):
         self._device_combo.addItem("(Default)", None)
         for dev in list_output_devices():
             self._device_combo.addItem(dev["name"], dev["index"])
+            # Add tooltip with full device name in case it's truncated
+            idx = self._device_combo.count() - 1
+            self._device_combo.setItemData(idx, dev["name"], Qt.ToolTipRole)
         self._device_combo.blockSignals(False)
 
     # ------------------------------------------------------------------

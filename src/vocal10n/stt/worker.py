@@ -150,13 +150,16 @@ class STTWorker(QThread):
                             if k >= last_confirmed_end - _CACHE_BUCKET
                         }
 
-                # Force-confirm pending segments older than max_segment_age
+                # Force-confirm pending segments longer than max_segment_age.
+                # We check segment *duration* (end - start), NOT whether the
+                # segment ended a long time ago.  A long segment whose end is
+                # still near cur_dur would never be caught by an end-age check
+                # because Whisper keeps extending it while the speaker talks.
                 if max_seg_age > 0:
-                    age_cutoff = cur_dur - max_seg_age
                     for s in pending:
                         if s.end <= last_confirmed_end + 0.1:
                             continue
-                        if s.end < age_cutoff:
+                        if (s.end - s.start) > max_seg_age:
                             if s.avg_logprob < min_conf or s.no_speech_prob > max_nsp:
                                 continue
                             accepted = self._transcript.confirm(

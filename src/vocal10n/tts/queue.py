@@ -76,6 +76,7 @@ class TTSQueue:
                 "text": text,
                 "language": language,
                 "timestamp": time.time(),
+                "enqueue_time": time.time(),  # Used for true text→audio latency
             })
             return True
         except queue.Full:
@@ -113,16 +114,9 @@ class TTSQueue:
             except queue.Empty:
                 continue
 
-            # Catch-up: if severely behind, skip to latest
-            if self._queue.qsize() >= 8:
-                logger.warning("TTS catch-up: queue has %d items, skipping to latest", self._queue.qsize() + 1)
-                while self._queue.qsize() > 0:
-                    try:
-                        request = self._queue.get_nowait()
-                    except queue.Empty:
-                        break
-
-            # Skip stale requests (older than 30s)
+            # Catch-up is now unnecessary since playback is non-blocking.
+            # Queue max_size=10 naturally prevents unbounded growth.
+            # Drop stale requests (older than 30s) to prevent memory waste
             age = time.time() - request["timestamp"]
             if age > 30.0:
                 logger.warning("Dropping stale TTS request (age %.1fs)", age)
@@ -142,9 +136,13 @@ class TTSQueue:
 
             status = result.get("status", "unknown")
             if status == "success" and self._audio_callback:
+                # Override request_start with enqueue_time so TTFA measures
+                # text arrival → first audio chunk (the real user-perceived latency)
+                enqueue_time = request.get("enqueue_time")
+                if enqueue_time:
+                    result["request_start"] = enqueue_time
                 if result.get("streaming"):
-                    logger.info("TTS streaming started in %.1fms (time-to-first-byte)", result.get("latency_ms", 0))
-                    # Callback will call play_stream() which blocks during playback
+                    logger.info("TTS streaming started in %.1fms (HTTP response)", result.get("latency_ms", 0))
                     self._audio_callback(result)
                 else:
                     audio_size = len(result.get("audio_data", b""))
