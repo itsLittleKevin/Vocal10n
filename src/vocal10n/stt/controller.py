@@ -159,9 +159,11 @@ class STTController(QObject):
         logger.info("STT pipeline started")
 
     def _stop_pipeline(self) -> None:
-        if self._worker is not None:
-            self._worker.stop()
-            self._worker = None
+        worker = self._worker
+        if worker is not None:
+            self._worker = None        # Clear ref first so re-entrant calls skip
+            worker.stop()              # Blocks until thread exits
+            worker.deleteLater()       # Let Qt clean up the QObject safely
         self._capture.stop()
         self._state.current_stt_text = ""
         get_dispatcher().publish_text(EventType.STT_STOPPED, "", source="stt")

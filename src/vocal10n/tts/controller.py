@@ -111,23 +111,25 @@ class TTSController(QObject):
         logger.info("Stopping TTS server...")
 
         try:
-            # Unsubscribe from translation events
-            dispatcher = get_dispatcher()
-            dispatcher.unsubscribe(EventType.TRANSLATION_CONFIRMED, self._on_translation)
+            # Unsubscribe from translation events first to stop new work
+            try:
+                dispatcher = get_dispatcher()
+                dispatcher.unsubscribe(EventType.TRANSLATION_CONFIRMED, self._on_translation)
+            except Exception:
+                pass
 
-            if self._queue:
-                self._queue.stop()
-                self._queue = None
-
-            if self._player:
-                self._player.stop()
-                self._player = None
-
-            if self._server:
-                self._server.stop()
-                self._server = None
-
+            q, self._queue = self._queue, None
+            p, self._player = self._player, None
+            s, self._server = self._server, None
             self._client = None
+
+            if q:
+                q.stop()
+            if p:
+                p.stop()
+            if s:
+                s.stop()
+
             self._state.tts_status = ModelStatus.UNLOADED
             logger.info("TTS server stopped")
 

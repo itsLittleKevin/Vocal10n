@@ -55,9 +55,12 @@ class STTWorker(QThread):
         self.start()
 
     def stop(self) -> None:
-        """Request graceful stop and wait."""
+        """Request graceful stop and wait for thread to finish."""
         self._running = False
-        self.wait(5000)
+        if not self.wait(8000):
+            logger.warning("STT worker did not stop within 8 s — terminating")
+            self.terminate()
+            self.wait(2000)
 
     # ------------------------------------------------------------------
     # Thread body

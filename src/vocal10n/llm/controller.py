@@ -84,14 +84,14 @@ class LLMController(QObject):
     def unload_model(self) -> None:
         """Stop translation + unload LLM backend."""
         self._unsubscribe_stt()
-        if self._translator:
-            self._translator.reset()
-            self._translator = None
+        translator, self._translator = self._translator, None
+        if translator:
+            translator.reset()
         self._state.llm_status = ModelStatus.UNLOADING
         try:
-            if self._engine:
-                self._engine.unload()
-                self._engine = None
+            engine, self._engine = self._engine, None
+            if engine:
+                engine.unload()
             self._state.llm_status = ModelStatus.UNLOADED
         except Exception as e:
             self._state.llm_status = ModelStatus.ERROR

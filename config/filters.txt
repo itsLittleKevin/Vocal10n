@@ -38,3 +38,12 @@ Come on
 你明白吗
 你真的吗
 拜拜
+
+# --- English hallucinations ---
+thank you
+thanks
+you're welcome
+hello
+goodbye
+yes
+no

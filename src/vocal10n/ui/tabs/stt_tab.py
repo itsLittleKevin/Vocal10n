@@ -119,6 +119,15 @@ class STTTab(QWidget):
 
         root.addWidget(tune_box)
 
+        # ── Filters ───────────────────────────────────────────────────
+        from vocal10n.ui.widgets.filter_list_editor import FilterListEditor
+        filters_box = QGroupBox("Hallucination Filters")
+        fb_lay = QVBoxLayout(filters_box)
+        filters_path = Path(__file__).resolve().parents[4] / "config" / "filters.txt"
+        self._filter_editor = FilterListEditor(filters_path)
+        fb_lay.addWidget(self._filter_editor)
+        root.addWidget(filters_box)
+
         # ── Recognition context note ─────────────────────────────────
         ctx_note = QLabel(
             "<b>Recognition Context:</b> Term files for phonetic correction "
