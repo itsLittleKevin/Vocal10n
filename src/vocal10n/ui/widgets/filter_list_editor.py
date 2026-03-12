@@ -145,7 +145,7 @@ class FilterListEditor(QFrame):
             )
             QMessageBox.information(
                 self, "Saved",
-                "Filters saved. They will be applied on next STT restart.",
+                "Filters saved and applied.",
             )
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to save filters: {e}")

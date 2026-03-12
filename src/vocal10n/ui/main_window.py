@@ -20,6 +20,7 @@ from vocal10n.pipeline.latency import LatencyTracker
 from vocal10n.state import SystemState
 from vocal10n.stt.controller import STTController
 from vocal10n.tts.controller import TTSController
+from vocal10n.tts.qwen3_controller import Qwen3TTSController
 from vocal10n.ui.section_a import SectionA
 from vocal10n.ui.section_b import SectionB
 from vocal10n.utils.gpu import get_gpu_monitor
@@ -75,6 +76,7 @@ class MainWindow(QMainWindow):
         stt_tab = self.section_b.stt_tab
         stt_tab._model_sel.load_requested.connect(self._stt_ctrl.load_model)
         stt_tab._model_sel.unload_requested.connect(self._stt_ctrl.unload_model)
+        stt_tab._filter_editor.filters_changed.connect(lambda _: self._stt_ctrl.reload_filters())
 
         # KB tab term files → STT controller
         kb_tab = self.section_b.kb_tab
@@ -102,6 +104,16 @@ class MainWindow(QMainWindow):
         tts_tab.stop_server_requested.connect(self._tts_ctrl.stop_server)
         tts_tab.reference_changed.connect(self._tts_ctrl.set_reference_audio)
         tts_tab.output_device_changed.connect(self._tts_ctrl.set_output_device)
+
+        # ── Qwen3-TTS controller ──────────────────────────────────────
+        self._qwen3_tts_ctrl = Qwen3TTSController(state, latency=self._latency, parent=self)
+
+        # Connect Qwen3 TTS tab signals → controller
+        qwen3_tab = self.section_b.qwen3_tts_tab
+        qwen3_tab.load_requested.connect(self._qwen3_tts_ctrl.load_model)
+        qwen3_tab.unload_requested.connect(self._qwen3_tts_ctrl.unload_model)
+        qwen3_tab.reference_changed.connect(self._qwen3_tts_ctrl.set_reference_audio)
+        qwen3_tab.output_device_changed.connect(self._qwen3_tts_ctrl.set_output_device)
 
         # ── Pipeline coordinator ─────────────────────────────────
         self._coordinator = PipelineCoordinator(state, self._latency, parent=self)
@@ -219,6 +231,7 @@ class MainWindow(QMainWindow):
             self._obs_server.stop,
             self._coordinator.shutdown,
             self._tts_ctrl.shutdown,
+            self._qwen3_tts_ctrl.shutdown,
             self._llm_ctrl.shutdown,
             self._stt_ctrl.shutdown,
             lambda: get_gpu_monitor().shutdown(),

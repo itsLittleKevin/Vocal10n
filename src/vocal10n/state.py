@@ -25,6 +25,7 @@ class SystemState(QObject):
     tts_enabled_changed = Signal(bool)
     tts_source_enabled_changed = Signal(bool)
     tts_target_enabled_changed = Signal(bool)
+    speaker_tagging_changed = Signal(bool)
 
     source_language_changed = Signal(Language)
     target_language_changed = Signal(Language)
@@ -49,6 +50,7 @@ class SystemState(QObject):
         self._tts_enabled = False
         self._tts_source_enabled = False
         self._tts_target_enabled = True  # Default: speak translated text
+        self._speaker_tagging = False
 
         # Languages
         self._source_language = Language.AUTO
@@ -149,6 +151,17 @@ class SystemState(QObject):
             if self._tts_target_enabled != value:
                 self._tts_target_enabled = value
                 self.tts_target_enabled_changed.emit(value)
+
+    @property
+    def speaker_tagging(self) -> bool:
+        return self._speaker_tagging
+
+    @speaker_tagging.setter
+    def speaker_tagging(self, value: bool) -> None:
+        with self._lock:
+            if self._speaker_tagging != value:
+                self._speaker_tagging = value
+                self.speaker_tagging_changed.emit(value)
 
     @property
     def source_language(self) -> Language:

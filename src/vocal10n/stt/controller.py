@@ -17,6 +17,7 @@ from vocal10n.state import SystemState
 from vocal10n.stt.audio_capture import AudioCapture
 from vocal10n.stt.engine import STTEngine
 from vocal10n.stt.filters import STTFilters
+from vocal10n.stt.diarizer import SpeakerDiarizer
 from vocal10n.stt.transcript import TranscriptManager
 from vocal10n.stt.worker import STTWorker
 
@@ -46,6 +47,7 @@ class STTController(QObject):
         self._capture = AudioCapture()
         self._engine = STTEngine()
         self._filters = STTFilters()
+        self._diarizer = SpeakerDiarizer()
         self._transcript = TranscriptManager(get_dispatcher(), latency, self._filters)
         self._worker: STTWorker | None = None
 
@@ -64,6 +66,7 @@ class STTController(QObject):
 
         # Wire state signals
         self._state.stt_enabled_changed.connect(self._on_enabled)
+        self._state.speaker_tagging_changed.connect(self._on_speaker_tagging)
 
         # Wire pipeline events → state (for UI display)
         dispatcher = get_dispatcher()
@@ -102,6 +105,18 @@ class STTController(QObject):
             self._initial_prompt = ""
         logger.info("Term files updated: %d files, %d terms, %d in prompt, prompt=%d chars",
                      len(paths), len(all_terms), min(len(all_terms), capacity), len(self._initial_prompt))
+
+    # ------------------------------------------------------------------
+    # Live filter reload
+    # ------------------------------------------------------------------
+
+    @Slot()
+    def reload_filters(self) -> None:
+        """Reload hallucination filters from disk (hot-reload during session)."""
+        filters_path = _PROJECT_ROOT / "config" / "filters.txt"
+        if filters_path.exists():
+            self._filters.load_filter_file(filters_path)
+            logger.info("Filters hot-reloaded from %s", filters_path)
 
     # ------------------------------------------------------------------
     # Model lifecycle (called from STT tab)
@@ -149,9 +164,12 @@ class STTController(QObject):
             return  # already running
 
         self._transcript.start_session()
+        if self._diarizer.is_loaded:
+            self._diarizer.reset_speakers()
         self._capture.start()
         self._worker = STTWorker(self._capture, self._engine, self._transcript,
-                                 initial_prompt=self._initial_prompt)
+                                 initial_prompt=self._initial_prompt,
+                                 diarizer=self._diarizer if self._diarizer.is_loaded else None)
         self._worker.error_occurred.connect(self._on_worker_error)
         self._worker.begin()
 
@@ -179,6 +197,27 @@ class STTController(QObject):
             self._start_pipeline()
         else:
             self._stop_pipeline()
+
+    @Slot(bool)
+    def _on_speaker_tagging(self, enabled: bool) -> None:
+        """Load or unload the speaker diarizer model."""
+        if enabled:
+            if not self._diarizer.is_loaded:
+                import threading
+                def _load():
+                    if self._diarizer.load():
+                        # Hot-swap into running worker
+                        if self._worker:
+                            self._worker.set_diarizer(self._diarizer)
+                        logger.info("Speaker tagging enabled")
+                    else:
+                        self._state.speaker_tagging = False
+                threading.Thread(target=_load, daemon=True).start()
+        else:
+            if self._worker:
+                self._worker.set_diarizer(None)
+            self._diarizer.unload()
+            logger.info("Speaker tagging disabled")
 
     @Slot(str)
     def _on_worker_error(self, msg: str) -> None:
@@ -212,5 +251,7 @@ class STTController(QObject):
     def shutdown(self) -> None:
         """Graceful shutdown — stop everything."""
         self._stop_pipeline()
+        if self._diarizer.is_loaded:
+            self._diarizer.unload()
         if self._engine.is_loaded:
             self._engine.unload()

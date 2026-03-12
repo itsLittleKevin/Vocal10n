@@ -32,6 +32,7 @@ class ConfirmedSegment:
     text_clean: str    # stripped of punctuation
     start: float
     end: float
+    speaker: str = ""  # e.g. "Speaker 1", empty if diarization disabled
 
 
 class TranscriptManager:
@@ -89,6 +90,7 @@ class TranscriptManager:
         no_speech_prob: float = 0.0,
         word_confidences: dict[str, float] | None = None,
         is_final: bool = False,
+        speaker: str = "",
     ) -> bool:
         """Process and accept a segment.  Returns ``True`` if accepted."""
 
@@ -136,7 +138,7 @@ class TranscriptManager:
         text_punct = self._filters.ensure_punctuation(text, is_final=is_final)
         text_clean = self._filters.strip_punctuation(text)
 
-        seg = ConfirmedSegment(text=text_punct, text_clean=text_clean, start=start, end=end)
+        seg = ConfirmedSegment(text=text_punct, text_clean=text_clean, start=start, end=end, speaker=speaker)
         self.segments.append(seg)
         self._history.append({"text": text_punct, "start": start, "end": end})
         if len(self._history) > 20:
@@ -195,6 +197,18 @@ class TranscriptManager:
 
     @property
     def full_transcript(self) -> str:
+        if not self.segments:
+            return ""
+        # Include speaker labels when diarization is active
+        if any(s.speaker for s in self.segments):
+            parts = []
+            current_speaker = ""
+            for s in self.segments:
+                if s.speaker and s.speaker != current_speaker:
+                    current_speaker = s.speaker
+                    parts.append(f"\n[{current_speaker}] ")
+                parts.append(s.text)
+            return "".join(parts).lstrip("\n")
         return "".join(s.text for s in self.segments)
 
     def clear(self) -> None:

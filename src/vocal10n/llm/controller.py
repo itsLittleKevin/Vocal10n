@@ -75,6 +75,10 @@ class LLMController(QObject):
             )
             self._state.llm_status = ModelStatus.LOADED
             logger.info("LLM backend loaded: %s (%s)", backend, model_name)
+
+            # Auto-subscribe if translation was already enabled before load
+            if self._state.llm_enabled:
+                self._subscribe_stt()
         except Exception as e:
             self._engine = None
             self._state.llm_status = ModelStatus.ERROR

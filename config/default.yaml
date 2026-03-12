@@ -110,6 +110,29 @@ tts:
   text_split_method: "cut0"
   batch_size: 1
 
+# --- TTS Qwen3 (Qwen3-TTS) -------------------------------------------------
+tts_qwen3:
+  model_name: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+  local_model_path: ""           # Set to local directory to skip download
+  local_tokenizer_path: ""
+  device: "cuda:0"
+  dtype: "bfloat16"
+  use_flash_attn: true
+
+  # Reference audio for voice cloning (same as GPT-SoVITS by default)
+  ref_audio_path: "reference_audio/audio_03.wav"
+  ref_audio_text: "I'm really sorry you were put on hold, but unfortunately we've had heavy call volume today. But I'm back now, and I can definitely check rates and availability for you."
+  ref_audio_lang: "en"
+
+  output_lang: "en"
+  speed_factor: 1.2
+
+  # Generation
+  top_k: 50
+  top_p: 0.9
+  temperature: 1.0
+  max_new_tokens: 2048
+
 # --- Audio Output -----------------------------------------------------------
 audio_output:
   device: null              # null = system default

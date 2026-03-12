@@ -120,7 +120,7 @@ class STTFilters:
                 continue
             if line.startswith("REGEX:"):
                 try:
-                    self._regex_filters.append(re.compile(line[6:].strip()))
+                    self._regex_filters.append(re.compile(line[6:].strip(), re.IGNORECASE))
                 except re.error as e:
                     logger.warning("Bad regex filter %r: %s", line, e)
             elif line.startswith("PHRASE:"):
@@ -228,8 +228,9 @@ class STTFilters:
             if phrase in text and cond:
                 return True
 
+        text_lower = text.lower()
         for pf in self._phrase_filters:
-            if pf in text:
+            if pf.lower() in text_lower:
                 return True
         for rx in self._regex_filters:
             if rx.search(text):

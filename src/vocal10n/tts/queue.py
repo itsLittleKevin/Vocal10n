@@ -9,17 +9,22 @@ import logging
 import queue
 import threading
 import time
-from typing import Any, Callable, Optional
-
-from vocal10n.tts.client import GPTSoVITSClient
+from typing import Any, Callable, Optional, Protocol
 
 logger = logging.getLogger(__name__)
+
+
+class TTSClientProtocol(Protocol):
+    """Protocol for TTS clients (GPTSoVITSClient / Qwen3TTSClient)."""
+
+    def synthesize(self, text: str, text_lang: str | None = None,
+                   streaming: bool = False) -> dict[str, Any]: ...
 
 
 class TTSQueue:
     """Queue for TTS requests with background worker."""
 
-    def __init__(self, client: GPTSoVITSClient, max_size: int = 10,
+    def __init__(self, client: TTSClientProtocol, max_size: int = 10,
                  max_pending: int = 3):
         self.client = client
         self.max_size = max_size

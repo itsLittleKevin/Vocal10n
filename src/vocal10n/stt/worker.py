@@ -10,8 +10,11 @@ algorithm is ported from the prebuild's
        pending time-bucket; the best version is used at confirm time.
 """
 
+from __future__ import annotations
+
 import logging
 import time
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QThread, Signal
 
@@ -19,6 +22,9 @@ from vocal10n.config import get_config
 from vocal10n.stt.audio_capture import AudioCapture
 from vocal10n.stt.engine import STTEngine
 from vocal10n.stt.transcript import TranscriptManager
+
+if TYPE_CHECKING:
+    from vocal10n.stt.diarizer import SpeakerDiarizer
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +42,7 @@ class STTWorker(QThread):
         engine: STTEngine,
         transcript: TranscriptManager,
         initial_prompt: str = "",
+        diarizer: SpeakerDiarizer | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -43,7 +50,23 @@ class STTWorker(QThread):
         self._engine = engine
         self._transcript = transcript
         self._initial_prompt = initial_prompt
+        self._diarizer = diarizer
         self._running = False
+
+    def set_diarizer(self, diarizer: SpeakerDiarizer | None) -> None:
+        """Hot-swap the diarizer (or disable with None)."""
+        self._diarizer = diarizer
+
+    def _identify_speaker(self, start: float, end: float) -> str:
+        """Identify speaker for a segment using its audio."""
+        if not self._diarizer or not self._diarizer.is_loaded:
+            return ""
+        audio = self._capture.get_from_offset(start)
+        # Trim to only the segment's duration
+        dur_samples = int((end - start) * self._capture.sample_rate)
+        if dur_samples > 0 and len(audio) > dur_samples:
+            audio = audio[:dur_samples]
+        return self._diarizer.identify_speaker(audio)
 
     # ------------------------------------------------------------------
     # Control
@@ -145,6 +168,7 @@ class STTWorker(QThread):
                         confidence=seg_data["confidence"],
                         no_speech_prob=seg_data["no_speech_prob"],
                         word_confidences=seg_data.get("word_confidences"),
+                        speaker=self._identify_speaker(seg_data["start"], seg_data["end"]),
                     )
                     if accepted:
                         last_confirmed_end = seg_data["end"]
@@ -170,6 +194,7 @@ class STTWorker(QThread):
                                 confidence=s.avg_logprob,
                                 no_speech_prob=s.no_speech_prob,
                                 word_confidences=s.word_confidences,
+                                speaker=self._identify_speaker(s.start, s.end),
                             )
                             if accepted:
                                 last_confirmed_end = s.end
@@ -218,6 +243,7 @@ class STTWorker(QThread):
                         no_speech_prob=s.no_speech_prob,
                         word_confidences=s.word_confidences,
                         is_final=(i == len(remaining) - 1),
+                        speaker=self._identify_speaker(s.start, s.end),
                     )
                     last_confirmed_end = s.end
             self._transcript.set_pending("")

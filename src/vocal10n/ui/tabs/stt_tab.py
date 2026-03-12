@@ -69,6 +69,17 @@ class STTTab(QWidget):
         lb_lay.addWidget(self._lang_combo, stretch=1)
         root.addWidget(lang_box)
 
+        # ── Speaker tagging ───────────────────────────────────────────
+        self._speaker_cb = QCheckBox("Enable Speaker Tagging (Diarization)")
+        self._speaker_cb.setToolTip(
+            "Identify different speakers and tag the transcript.\n"
+            "Uses ~1-1.5 GB VRAM. Adds ~100-200 ms latency per segment.\n"
+            "Requires pyannote-audio."
+        )
+        self._speaker_cb.setChecked(self._state.speaker_tagging)
+        self._speaker_cb.toggled.connect(self._on_speaker_tagging)
+        root.addWidget(self._speaker_cb)
+
         # ── Latency tuning ────────────────────────────────────────────
         tune_box = QGroupBox("Latency Tuning")
         tl = QVBoxLayout(tune_box)
@@ -171,3 +182,7 @@ class STTTab(QWidget):
             self._state.source_language = Language(code)
         except ValueError:
             pass
+
+    @Slot(bool)
+    def _on_speaker_tagging(self, checked: bool) -> None:
+        self._state.speaker_tagging = checked

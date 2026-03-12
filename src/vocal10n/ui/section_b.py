@@ -14,7 +14,7 @@ from vocal10n.ui.tabs.output_tab import OutputTab
 from vocal10n.ui.tabs.stt_tab import STTTab
 from vocal10n.ui.tabs.training_tab import TrainingTab
 from vocal10n.ui.tabs.translation_tab import TranslationTab
-from vocal10n.ui.tabs.tts_tab import TTSTab
+from vocal10n.ui.tabs.tts_container_tab import TTSContainerTab
 
 
 def _placeholder(text: str) -> QWidget:
@@ -53,9 +53,11 @@ class SectionB(QTabWidget):
         self.translation_tab = TranslationTab(state)
         self.addTab(_scrollable(self.translation_tab), "Translation")
 
-        # Phase 5: real TTS tab
-        self.tts_tab = TTSTab(state)
-        self.addTab(_scrollable(self.tts_tab), "TTS")
+        # Phase 5: TTS tab with engine sub-tabs (GPT-SoVITS + Qwen3)
+        self.tts_container = TTSContainerTab(state)
+        self.tts_tab = self.tts_container.gptsovits_tab      # GPT-SoVITS sub-tab
+        self.qwen3_tts_tab = self.tts_container.qwen3_tab    # Qwen3-TTS sub-tab
+        self.addTab(_scrollable(self.tts_container), "TTS")
 
         # Phase 6: real Output tab
         self.output_tab = OutputTab(state)
