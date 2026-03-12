@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vocal10n.constants import ModelStatus
+from vocal10n.constants import Language, ModelStatus
 from vocal10n.llm.controller import LLMController
 from vocal10n.obs.server import OBSSubtitleServer
 from vocal10n.pipeline.coordinator import PipelineCoordinator
@@ -89,6 +89,8 @@ class MainWindow(QMainWindow):
         trans_tab.load_requested.connect(self._llm_ctrl.load_model)
         trans_tab.unload_requested.connect(self._llm_ctrl.unload_model)
         trans_tab.target_language_changed.connect(self._llm_ctrl.set_target_language)
+        # Also update SystemState.target_language so TTS gets the correct language
+        trans_tab.target_language_changed.connect(self._on_target_language_changed)
 
         # Manual input: source panel text → LLM translation
         self.section_a.stt_accumulated_panel.text_submitted.connect(
@@ -114,6 +116,12 @@ class MainWindow(QMainWindow):
         qwen3_tab.unload_requested.connect(self._qwen3_tts_ctrl.unload_model)
         qwen3_tab.reference_changed.connect(self._qwen3_tts_ctrl.set_reference_audio)
         qwen3_tab.output_device_changed.connect(self._qwen3_tts_ctrl.set_output_device)
+
+        # ── TTS mutual exclusion (only one engine active at a time) ────
+        # Starting GPT-SoVITS → unload Qwen3-TTS
+        tts_tab.start_server_requested.connect(lambda: self._qwen3_tts_ctrl.unload_model())
+        # Loading Qwen3-TTS → stop GPT-SoVITS
+        qwen3_tab.load_requested.connect(lambda: self._tts_ctrl.stop_server())
 
         # ── Pipeline coordinator ─────────────────────────────────
         self._coordinator = PipelineCoordinator(state, self._latency, parent=self)
@@ -179,6 +187,17 @@ class MainWindow(QMainWindow):
         stt_loaded = self._state.stt_status == ModelStatus.LOADED
         llm_loaded = self._state.llm_status == ModelStatus.LOADED
         self.section_a.stt_accumulated_panel.set_editable(llm_loaded and not stt_loaded)
+
+    def _on_target_language_changed(self, lang_name: str) -> None:
+        """Update SystemState.target_language when translation target changes."""
+        # Map display name to Language enum
+        lang_map = {
+            "English": Language.ENGLISH,
+            "Chinese": Language.CHINESE,
+        }
+        lang = lang_map.get(lang_name)
+        if lang:
+            self._state.target_language = lang
 
     # ------------------------------------------------------------------
     # GPU polling

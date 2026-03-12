@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QScrollArea,
     QTabWidget,
     QVBoxLayout,
@@ -17,9 +19,19 @@ from PySide6.QtWidgets import (
 )
 
 from vocal10n.config import get_config
+from vocal10n.constants import Language
 from vocal10n.state import SystemState
 from vocal10n.ui.tabs.qwen3_tts_tab import Qwen3TTSTab
 from vocal10n.ui.tabs.tts_tab import TTSTab
+
+
+# Map display names to Language enum
+_LANG_FROM_DISPLAY = {
+    "English": Language.ENGLISH,
+    "Chinese": Language.CHINESE,
+    "Auto-detect": Language.AUTO,
+    "Auto": Language.AUTO,
+}
 
 
 class TTSContainerTab(QWidget):
@@ -38,15 +50,36 @@ class TTSContainerTab(QWidget):
         toggle_box = QGroupBox("TTS Output")
         tgl = QVBoxLayout(toggle_box)
 
+        # Source row with checkbox and language status
+        source_row = QHBoxLayout()
         self._source_cb = QCheckBox("Speak Source Text (original language)")
         self._source_cb.setChecked(self._state.tts_source_enabled)
         self._source_cb.toggled.connect(self._on_source_toggled)
-        tgl.addWidget(self._source_cb)
+        source_row.addWidget(self._source_cb)
+        source_row.addStretch()
+        self._source_lang_label = QLabel()
+        self._source_lang_label.setProperty("dim", True)
+        source_row.addWidget(self._source_lang_label)
+        tgl.addLayout(source_row)
 
+        # Target row with checkbox and language status
+        target_row = QHBoxLayout()
         self._target_cb = QCheckBox("Speak Target Text (translated)")
         self._target_cb.setChecked(self._state.tts_target_enabled)
         self._target_cb.toggled.connect(self._on_target_toggled)
-        tgl.addWidget(self._target_cb)
+        target_row.addWidget(self._target_cb)
+        target_row.addStretch()
+        self._target_lang_label = QLabel()
+        self._target_lang_label.setProperty("dim", True)
+        target_row.addWidget(self._target_lang_label)
+        tgl.addLayout(target_row)
+
+        # Initialize language labels
+        self._update_language_labels()
+
+        # Listen for language changes
+        self._state.source_language_changed.connect(self._update_language_labels)
+        self._state.target_language_changed.connect(self._update_language_labels)
 
         root.addWidget(toggle_box)
 
@@ -84,3 +117,21 @@ class TTSContainerTab(QWidget):
     def _on_target_toggled(self, checked: bool) -> None:
         self._state.tts_target_enabled = checked
         self._cfg.set("tts.target_enabled", checked)
+
+    def _update_language_labels(self) -> None:
+        """Update the language status labels based on current state."""
+        source_lang = self._state.source_language
+        target_lang = self._state.target_language
+
+        # Get display names
+        source_name = source_lang.display_name
+        target_name = target_lang.display_name
+
+        self._source_lang_label.setText(f"Speaking: {source_name}")
+        self._target_lang_label.setText(f"Speaking: {target_name}")
+
+    def set_target_language_from_string(self, lang_name: str) -> None:
+        """Set target language from a display name string (e.g., 'English', 'Chinese')."""
+        lang = _LANG_FROM_DISPLAY.get(lang_name)
+        if lang:
+            self._state.target_language = lang
